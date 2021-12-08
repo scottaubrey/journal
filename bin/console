@@ -2,8 +2,10 @@
 <?php
 
 use eLife\Journal\AppKernel;
+use eLife\Journal\Console;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
 use Symfony\Component\Console\Input\ArgvInput;
+use Symfony\Component\Console\Output\ConsoleOutput;
 use Symfony\Component\Debug\Debug;
 
 umask(0002);
@@ -16,11 +18,15 @@ $_SERVER['APP_ENV'] = $_SERVER['APP_ENV'] ?? 'dev';
 $_SERVER['APP_DEBUG'] = in_array($_SERVER['APP_ENV'], ['ci', 'dev']);
 
 $input = new ArgvInput();
+$output = new ConsoleOutput();
 
 if ($_SERVER['APP_DEBUG']) {
     Debug::enable();
 }
 
 $kernel = new AppKernel($_SERVER['APP_ENV'], $_SERVER['APP_DEBUG']);
+
 $application = new Application($kernel);
-$application->run($input);
+$console = new Console($application, $kernel);
+
+$console->run($input, $output);

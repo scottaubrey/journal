@@ -3,7 +3,9 @@
 namespace eLife\Journal\Guzzle;
 
 use eLife\Journal\Exception\CiviCrmResponseError;
+use Exception;
 use GuzzleHttp\ClientInterface;
+use GuzzleHttp\Exception\RequestException;
 use GuzzleHttp\Promise\PromiseInterface;
 use GuzzleHttp\Psr7\Request;
 use GuzzleHttp\Psr7\Response;
@@ -42,7 +44,7 @@ final class CiviCrmClient implements CiviCrmClientInterface
         $this->siteKey = $siteKey;
     }
 
-    private function storePreferencesUrl(int $contactId, string $preferencesUrl) : PromiseInterface
+    public function storePreferencesUrl(int $contactId, string $preferencesUrl) : PromiseInterface
     {
         return $this->client->sendAsync($this->prepareRequest('POST'), $this->options([
             'query' => [
@@ -197,6 +199,50 @@ final class CiviCrmClient implements CiviCrmClientInterface
             return [
                 'contact_id' => $contactId,
             ];
+        });
+    }
+
+    public function getAllSubscribers(int $ceiling = 0, int $limit = 100, int $offset = 0) : array
+    {
+        $allSubscribers = [];
+        while ((0 === $ceiling || ($limit + $offset) <= $ceiling)) {
+            try {
+                $subscribers = $this->getSubscribers($limit, $offset)->wait();
+            } catch (RequestException $exception) {
+                throw new Exception(implode(',', $allSubscribers), 0, $exception);
+            }
+
+            $offset += $limit;
+            $allSubscribers = array_merge($allSubscribers, $subscribers);
+        }
+
+        return $allSubscribers;
+    }
+
+    private function getSubscribers($limit = 100, $offset = 0) : PromiseInterface
+    {
+        return $this->client->sendAsync($this->prepareRequest('GET'), $this->options([
+            'query' => [
+                'entity' => 'Contact',
+                'action' => 'get',
+                'json' => [
+                    'group' => [
+                        self::GROUP_LATEST_ARTICLES,
+                        self::GROUP_EARLY_CAREER,
+                        self::GROUP_TECHNOLOGY,
+                        self::GROUP_ELIFE_NEWSLETTER,
+                    ],
+                    self::FIELD_PREFERENCES_URL => ['IS NULL' => 1],
+                    'options' => [
+                        'limit' => $limit,
+                        'offset' => $offset,
+                    ],
+                ],
+            ],
+        ]))->then(function (Response $response) {
+            return $this->prepareResponse($response);
+        })->then(function (array $response) {
+            return array_keys($response['values'] ?? []);
         });
     }
 
