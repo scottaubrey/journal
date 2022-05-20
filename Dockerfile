@@ -1,8 +1,8 @@
 ARG image_tag=latest
 ARG php_version
-FROM elifesciences/journal_assets_builder:${image_tag} AS assets
+FROM --platform=linux/amd64 elifesciences/journal_assets_builder:${image_tag} AS assets
 FROM elifesciences/journal_composer:${image_tag} AS composer
-FROM elifesciences/php_7.1_fpm:${php_version}
+FROM scottaubrey/elifesciences-php:7.1-fpm@sha256:e8c0964331152be238eb3f294ba35b040760cf3cc1aa8d509a7e3cb167f8c537
 
 ENV PROJECT_FOLDER=/srv/journal
 ENV PHP_ENTRYPOINT=web/app.php

@@ -1,4 +1,4 @@
-FROM composer:1.6.4
+FROM composer:1.10@sha256:7b75b9b1614cdfa09357a7c62bb2516d3b5ee8418e048376734ea1e19ed0d30f
 
 ARG composer_dev_arg
 

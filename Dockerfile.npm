@@ -1,5 +1,5 @@
 ARG node_version
-FROM node:${node_version} as npm
+FROM --platform=linux/amd64 node:${node_version} as npm
 
 RUN apt-get update && apt-get install --no-install-recommends -y \
     nasm \
