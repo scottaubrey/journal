@@ -38,8 +38,7 @@ test-smoke:
 	docker-compose --profile=tests -f docker-compose.combined.yml down
 
 clean-test:
-	docker-compose -f docker-compose.combined.yml down
-	docker image rm $(REPO_PREFIX):tests
+	docker-compose --profile=tests -f docker-compose.combined.yml down --rmi local
 
 build:
 	docker buildx build --load -f Dockerfile.combined --target app . -t $(REPO_PREFIX):$(IMAGE_TAG) -t $(REPO_PREFIX):latest
