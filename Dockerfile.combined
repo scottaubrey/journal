@@ -121,6 +121,8 @@ COPY --chown=elife:elife .ci/ .ci/
 COPY --chown=elife:elife assets/tests/ assets/tests/
 COPY --chown=elife:elife features/ features/
 COPY --chown=elife:elife test/ test/
+COPY --chown=elife:elife smoke_tests.sh smoke_tests.sh
+COPY --chown=elife:elife status_test.sh status_test.sh
 RUN composer --no-interaction install --ignore-platform-reqs --classmap-authoritative --no-suggest --prefer-dist --dev
 USER www-data
 CMD true
