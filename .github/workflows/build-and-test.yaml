@@ -15,8 +15,8 @@ jobs:
         with:
           legacy: true
 
-      - name: run docker build
-        run: make build
+      - name: run docker build for test image
+        run: make build-test
 
       # save image for tests
       - name: save docker image

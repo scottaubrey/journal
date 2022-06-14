@@ -40,8 +40,11 @@ test-smoke:
 clean-test:
 	docker-compose --profile=tests -f docker-compose.combined.yml down --rmi local
 
-build:
-	docker buildx build --load -f Dockerfile.combined --target app . -t $(REPO_PREFIX):$(IMAGE_TAG) -t $(REPO_PREFIX):latest
+build-test:
+	docker-compose --profile=tests -f docker-compose.combined.yml build
+
+save-test: build-test
+	docker save $$(docker-compose images | grep tests | awk '{print $$2}') > build/test.docker
 
 buildx-and-push:
 	docker buildx build --push --platform linux/amd64,linux/arm64  -f Dockerfile.combined --target app . -t $(REPO_PREFIX):$(IMAGE_TAG) -t $(REPO_PREFIX):latest
