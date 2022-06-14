@@ -20,7 +20,7 @@ jobs:
 
       # save image for tests
       - name: save docker image
-        run: make save
+        run: make save-test
       - uses: actions/upload-artifact@v2
         with:
           name: test-image
