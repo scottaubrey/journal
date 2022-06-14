@@ -46,10 +46,8 @@ jobs:
         with:
           name: test-image
           path: build/test.docker
-      - name: debug what's in build/test.docker
-        run: ls -la build/test.docker
       - name: Run test in Docker
-        run: docker load < build/test.docker
+        run: docker load < build/test.docker/test.docker
 
 
       - name: test docker image
