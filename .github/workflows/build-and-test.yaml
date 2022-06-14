@@ -19,6 +19,8 @@ jobs:
         run: make build-test
 
       # save image for tests
+      - name: get docker image name
+        run: docker-compose images
       - name: save docker image
         run: make save-test
       - uses: actions/upload-artifact@v2
