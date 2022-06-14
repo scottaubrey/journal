@@ -25,17 +25,17 @@ test-phpcs:
 test-phpunit:
 	docker-compose --profile=tests -f docker-compose.combined.yml up -d || true
 	docker-compose --profile=tests -f docker-compose.combined.yml run --rm tests .ci/phpunit
-	docker-compose -f docker-compose.combined.yml down
+	docker-compose --profile=tests -f docker-compose.combined.yml down
 test-behat:
 	docker-compose --profile=tests -f docker-compose.combined.yml up -d || true
 	docker-compose --profile=tests -f docker-compose.combined.yml run --rm tests .ci/behat
-	docker-compose -f docker-compose.combined.yml down
+	docker-compose --profile=tests -f docker-compose.combined.yml down
 
 test-smoke:
 	docker-compose --profile=tests -f docker-compose.combined.yml up -d || true
 	docker-compose --profile=tests -f docker-compose.combined.yml run --rm tests smoke_tests.sh web 80
 	docker-compose --profile=tests -f docker-compose.combined.yml run --rm tests status_test.sh web 80
-	docker-compose -f docker-compose.combined.yml down
+	docker-compose --profile=tests -f docker-compose.combined.yml down
 
 clean-test:
 	docker-compose -f docker-compose.combined.yml down
