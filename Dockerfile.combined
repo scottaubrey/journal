@@ -104,6 +104,7 @@ COPY --from=jq /usr/local/bin/jq /usr/bin/jq
 COPY --chown=elife:elife --from=composer_dev ${project_folder}/vendor vendor
 COPY --chown=elife:elife --from=composer_dev  /usr/bin/composer /usr/bin/composer
 COPY --chown=elife:elife composer.json composer.lock ./
+
 COPY .docker/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
 
 RUN mkdir -p build/ci var/fixtures && \
@@ -120,6 +121,7 @@ COPY --chown=elife:elife .ci/ .ci/
 COPY --chown=elife:elife assets/tests/ assets/tests/
 COPY --chown=elife:elife features/ features/
 COPY --chown=elife:elife test/ test/
+RUN composer --no-interaction install --ignore-platform-reqs --classmap-authoritative --no-suggest --prefer-dist --dev
 USER www-data
 CMD true
 
