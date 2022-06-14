@@ -14,10 +14,20 @@ jobs:
         uses: ndeloof/install-compose-action@main
         with:
           legacy: true
+
       - name: run docker build
         run: make build
+
+      # save image for tests
+      - name: save docker image
+        run: make save
+      - uses: actions/upload-artifact@v2
+        with:
+          name: test-image
+          path: build/test.docker
   test:
     runs-on: ubuntu-latest
+    needs: build
     strategy:
       matrix:
         tests: [composer, phpcs, phpunit, behat]
@@ -28,5 +38,18 @@ jobs:
         uses: ndeloof/install-compose-action@main
         with:
           legacy: true
+
+
+      # use saved tests image
+      - name: Download Docker Image (Artifact)
+        uses: actions/download-artifact@v2
+        with:
+          name: dtest-image
+          path: build/test.docker
+      - name: Run test in Docker
+        run: |
+          docker load < build/test.docker
+
+
       - name: test docker image
         run: make test-${{ matrix.tests }}
