@@ -1,0 +1,23 @@
+name: build-and-test
+on:
+  pull_request:
+    branches:
+      - master
+      - develop
+jobs:
+  build-and-test:
+    strategy:
+      matrix:
+        tests: [composer, phpcs, phpunit, behat, smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Install Compose
+        uses: ndeloof/install-compose-action@main
+        with:
+          legacy: true
+      - name: run docker build
+        run: make build
+      - name: test docker image
+        run: make test-${{ matrix.test }}

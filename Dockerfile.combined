@@ -1,0 +1,166 @@
+ARG php_version=7.1-fpm@sha256:e8c0964331152be238eb3f294ba35b040760cf3cc1aa8d509a7e3cb167f8c537
+ARG composer_version=1.10@sha256:7b75b9b1614cdfa09357a7c62bb2516d3b5ee8418e048376734ea1e19ed0d30f
+ARG node_version=6.17-stretch@sha256:e133e66ec3bfc98da0440e552f452e5cdf6413319d27a2db3b01ac4b319759b3
+ARG composer_dev_arg
+ARG project_folder=/srv/journal
+
+#####
+## Dependency
+## some of the base images lack jq
+FROM pinterb/jq:0.0.16 AS jq
+
+#####
+## Build image: Get PHP dependencies
+##
+FROM composer:${composer_version} as composer
+ARG project_folder
+WORKDIR ${project_folder}
+RUN apk add --no-cache \
+    patch
+COPY composer.json \
+    composer.lock \
+    ./
+COPY test/ test/
+COPY src/ src/
+RUN composer --no-interaction install --no-dev --ignore-platform-reqs --classmap-authoritative --no-suggest --prefer-dist
+
+#####
+## Build image: Get PHP dependencies (including dev deps)
+##
+FROM composer as composer_dev
+RUN composer --no-interaction install --ignore-platform-reqs --classmap-authoritative --no-suggest --prefer-dist
+
+#####
+## Build image: Get node build chain and build assets
+##
+FROM --platform=linux/amd64 node:${node_version} as assets
+ARG project_folder
+WORKDIR ${project_folder}
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    nasm \
+    libvips-dev \
+    phantomjs lsb-release \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY npm-shrinkwrap.json \
+    package.json \
+    ./
+ENV QT_QPA_PLATFORM=offscreen
+RUN npm install
+COPY assets/images/ assets/images/
+COPY gulpfile.js ./
+COPY --from=composer ${project_folder}/vendor/elife/patterns/resources/assets/ vendor/elife/patterns/resources/assets/
+RUN node_modules/.bin/gulp assets
+
+
+
+
+#####
+## output image: App
+##
+FROM scottaubrey/elifesciences-php:${php_version} as app
+ARG project_folder
+ENV project_folder=${project_folder}
+ENV PHP_ENTRYPOINT=web/app.php
+WORKDIR ${project_folder}
+
+USER root
+RUN pecl install redis && \
+    docker-php-ext-enable redis && \
+    rm -rf /tmp/pear/
+RUN mkdir -p build var && \
+    chown --recursive elife:elife . && \
+    chown --recursive www-data:www-data var
+
+COPY --chown=elife:elife .docker/smoke_tests.sh ./
+COPY --chown=elife:elife bin/ bin/
+COPY --chown=elife:elife web/ web/
+COPY --chown=elife:elife app/ app/
+COPY --chown=elife:elife build/critical-css/ build/critical-css/
+COPY --chown=elife:elife --from=composer ${project_folder}/vendor/ vendor/
+COPY --chown=elife:elife --from=assets ${project_folder}/build/rev-manifest.json build/
+COPY --chown=elife:elife --from=assets ${project_folder}/web/ web/
+COPY --chown=elife:elife src/ src/
+
+USER www-data
+
+
+#####
+## output image: debug_App (app with Xdebug enabled)
+##
+FROM app as debug
+USER root
+RUN pecl install xdebug-2.9.8 # update version after upgrade to PHP >7.3
+COPY .docker/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
+USER www-data
+
+#####
+## output image: tests
+##
+FROM debug as test
+USER root
+COPY --from=jq /usr/local/bin/jq /usr/bin/jq
+
+COPY --chown=elife:elife --from=composer_dev ${project_folder}/vendor vendor
+COPY --chown=elife:elife --from=composer_dev  /usr/bin/composer /usr/bin/composer
+COPY --chown=elife:elife composer.json composer.lock ./
+COPY .docker/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
+
+RUN mkdir -p build/ci var/fixtures && \
+    chown --recursive www-data:www-data build/ci var/fixtures
+COPY --chown=elife:elife \
+    behat.yml.dist \
+    phpunit.xml.dist \
+    phpcs.xml.dist \
+    ./
+
+COPY --chown=elife:elife .docker/php.ini /usr/local/etc/php/conf.d/x-dev.ini
+COPY --chown=elife:elife .docker/parameters.yml app/config/
+COPY --chown=elife:elife .ci/ .ci/
+COPY --chown=elife:elife assets/tests/ assets/tests/
+COPY --chown=elife:elife features/ features/
+COPY --chown=elife:elife test/ test/
+USER www-data
+CMD true
+
+#####
+## Build image: critical-css
+## Note: this target cannot be run without the journal app image above running too. See `docker-compose.combined.yml`
+##
+FROM assets as critical-css
+# From list at https://developers.google.com/web/tools/puppeteer/troubleshooting#chrome_headless_doesnt_launch
+RUN apt-get update && apt-get install --no-install-recommends -y \
+    fonts-liberation \
+    gconf-service \
+    libappindicator1 \
+    libasound2 \
+    libatk1.0-0 \
+    libcups2 \
+    libdbus-1-3 \
+    libgconf-2-4 \
+    libgtk-3-0 \
+    libnspr4 \
+    libnss3 \
+    libvips \
+    libx11-xcb1 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxfixes3 \
+    libxi6 \
+    libxrandr2 \
+    libxss1 \
+    libxtst6 \
+    locales \
+    lsb-release \
+    unzip \
+    xdg-utils \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=jq /usr/local/bin/jq /usr/bin/jq
+COPY check_critical_css.sh \
+    critical-css.json \
+    gulpfile.js \
+    ./
+
+CMD node_modules/.bin/gulp critical-css:generate && ./check_critical_css.sh
