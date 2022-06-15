@@ -28,7 +28,8 @@ test-phpunit:
 	docker-compose --profile=tests -f docker-compose.combined.yml down
 test-behat:
 	docker-compose --profile=tests -f docker-compose.combined.yml up -d || true
-	docker-compose --profile=tests -f docker-compose.combined.yml run --rm tests .ci/behat
+	# docker-compose --profile=tests -f docker-compose.combined.yml run --rm tests .ci/behat
+	docker-compose --profile=tests -f docker-compose.combined.yml run --rm tests vendor/bin/behat -vv
 	docker-compose --profile=tests -f docker-compose.combined.yml down
 
 test-smoke:
