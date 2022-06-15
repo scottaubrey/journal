@@ -17,14 +17,6 @@ jobs:
 
       - name: run docker build for test image
         run: make build-test
-
-      # save image for tests
-      - name: save docker image
-        run: make save-test
-      - uses: actions/upload-artifact@v2
-        with:
-          name: test-image
-          path: build/test.docker
   test:
     runs-on: ubuntu-latest
     needs: build
@@ -38,17 +30,5 @@ jobs:
         uses: ndeloof/install-compose-action@main
         with:
           legacy: true
-
-
-      # use saved tests image
-      - name: Download Docker Image (Artifact)
-        uses: actions/download-artifact@v2
-        with:
-          name: test-image
-          path: build/test.docker
-      - name: Run test in Docker
-        run: docker load < build/test.docker/test.docker
-
-
       - name: test docker image
         run: make test-${{ matrix.tests }}
