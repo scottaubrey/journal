@@ -119,3 +119,4 @@ services:
             - SYMFONY__API_URL_PUBLIC=${API_URL_PUBLIC}
             - SYMFONY__API_KEY=${API_KEY}
             - XDEBUG_SESSION=1
+            - APP_ENV=ci
