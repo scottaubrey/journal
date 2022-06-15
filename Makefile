@@ -1,7 +1,7 @@
 REPO_PREFIX=scottaubrey/elifesciences-journal
 IMAGE_TAG=develop
 
-build-app:
+build:
 	docker-compose -f docker-compose.combined.yml build
 
 install-dependencies:
