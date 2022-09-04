@@ -6,7 +6,7 @@ services:
         image: redis:6.2-alpine
     api_dummy:
         # image: elifesciences/api-dummy:${DEPENDENCIES_API_DUMMY}
-        image: scottaubrey/elifesciences-api-dummy:latest
+        image: ghcr.io/scottaubrey/elifesciences-api-dummy:latest
         ports:
             - '${JOURNAL_API_DUMMY_PORT}:8080'
 
@@ -78,7 +78,7 @@ services:
 
             # Asset build chain output files
             - ./node_modules:/srv/journal/node_modules:rw
-            - ./assets:/srv/journal/web:rw
+            - ./assets:/srv/journal/assets:rw
             - ./build:/srv/journal/build:rw
             - ./web:/srv/journal/web:rw
         command: bash -c 'npm install && node_modules/.bin/gulp assets'
@@ -120,3 +120,6 @@ services:
             - SYMFONY__API_KEY=${API_KEY}
             - XDEBUG_SESSION=1
             - APP_ENV=ci
+        volumes:
+            # critical-css output files
+            - ./build:/srv/journal/build:rw

@@ -1,4 +1,4 @@
-ARG php_version=7.1-fpm@sha256:e8c0964331152be238eb3f294ba35b040760cf3cc1aa8d509a7e3cb167f8c537
+ARG php_version=7.1-fpm@sha256:85819ac1a66b10c4f16defd47379ed5274c8602df86398bb963c29f3c0d67880
 ARG composer_version=1.10@sha256:7b75b9b1614cdfa09357a7c62bb2516d3b5ee8418e048376734ea1e19ed0d30f
 ARG node_version=6.17-stretch@sha256:e133e66ec3bfc98da0440e552f452e5cdf6413319d27a2db3b01ac4b319759b3
 ARG composer_dev_arg
@@ -58,7 +58,7 @@ RUN node_modules/.bin/gulp assets
 #####
 ## output image: App
 ##
-FROM scottaubrey/elifesciences-php:${php_version} as app
+FROM ghcr.io/scottaubrey/elifesciences-php:${php_version} as app
 ARG project_folder
 ENV project_folder=${project_folder}
 ENV PHP_ENTRYPOINT=web/app.php
