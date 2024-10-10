@@ -1,19 +1,5 @@
-REPO_PREFIX=scottaubrey/elifesciences-journal
-IMAGE_TAG=develop
-
 build:
 	docker-compose -f docker-compose.combined.yml build
-
-install-dependencies:
-	@# These install dependencies into the working tree for the bind mount to the docker container to work
-	docker-compose --profile=dependencies -f docker-compose.combined.yml run composer
-	docker-compose --profile=dependencies -f docker-compose.combined.yml run assets
-
-start: build-app install-dependencies
-	docker-compose -f docker-compose.combined.yml up || true
-
-stop:
-	docker-compose -f docker-compose.combined.yml down --remove-orphans --volumes || true
 
 test: test-composer test-phpcs test-phpunit test-behat test-smoke
 
@@ -46,9 +32,6 @@ build-test:
 
 save-test: build-test
 	docker save $$(docker image ls | grep journal | grep tests | awk '{print $$1}') > build/test.docker
-
-buildx-and-push:
-	docker buildx build --push --platform linux/amd64,linux/arm64  -f Dockerfile.combined --target app . -t $(REPO_PREFIX):$(IMAGE_TAG) -t $(REPO_PREFIX):latest
 
 build-critical-css:
 	@# Building critical css requires a full stack to be running
