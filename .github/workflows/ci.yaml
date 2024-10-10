@@ -42,7 +42,7 @@ jobs:
         run: make test-${{ matrix.tests }}
 
   build-and-push:
-    needs: [tests]
+    needs: [test]
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/combined-dockerfile'
     steps:
