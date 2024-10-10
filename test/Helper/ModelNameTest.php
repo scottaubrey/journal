@@ -35,6 +35,7 @@ final class ModelNameTest extends TestCase
         return $this->arrayProvider([
             'correction' => ['Correction', 'Corrections'],
             'editorial' => ['Editorial', 'Editorials'],
+            'expression-concern' => ['Expression of Concern', 'Expressions of Concern'],
             'feature' => ['Feature Article', 'Feature Articles'],
             'insight' => ['Insight', 'Insights'],
             'research-advance' => ['Research Advance', 'Research Advances'],
@@ -57,6 +58,7 @@ final class ModelNameTest extends TestCase
             'podcast-episode' => ['Podcast', 'Podcasts'],
             'press-package' => ['Press Pack', 'Press Packs'],
             'promotional-collection' => ['Highlight', 'Highlights'],
+            'reviewed-preprint' => ['Reviewed Preprint', 'Reviewed Preprints'],
         ]);
     }
 

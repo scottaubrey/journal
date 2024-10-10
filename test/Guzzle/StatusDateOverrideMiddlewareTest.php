@@ -101,7 +101,7 @@ final class StatusDateOverrideMiddlewareTest extends KernelTestCase
                     ],
                 ],
             ],
-            'application/vnd.elife.article-related+json; version=1' => [
+            'application/vnd.elife.article-related+json; version=2' => [
                 [
                     $this->createArticlePoA('poa-with-rds-article'),
                     $this->createArticleVoR('vor-with-rds-article'),
@@ -111,15 +111,15 @@ final class StatusDateOverrideMiddlewareTest extends KernelTestCase
                     $this->createArticleVoR('vor-with-rds-article', '2030-01-02T00:00:00Z'),
                 ],
             ],
-            'application/vnd.elife.article-poa+json; version=3' => [
+            'application/vnd.elife.article-poa+json; version=4' => [
                 $this->createArticlePoA('poa-with-rds-article'),
                 $this->createArticlePoA('poa-with-rds-article', '2030-01-01T00:00:00Z'),
             ],
-            'application/vnd.elife.article-vor+json; version=6' => [
+            'application/vnd.elife.article-vor+json; version=8' => [
                 $this->createArticleVoR('vor-with-rds-article', null, false),
                 $this->createArticleVoR('vor-with-rds-article', '2030-01-02T00:00:00Z', false),
             ],
-            'application/vnd.elife.collection+json; version=2' => [
+            'application/vnd.elife.collection+json; version=3' => [
                 $this->createCollection('vor-with-rds-article', null, false),
                 $this->createCollection('vor-with-rds-article', '2030-01-02T00:00:00Z', false),
             ],
@@ -199,7 +199,7 @@ final class StatusDateOverrideMiddlewareTest extends KernelTestCase
                 $this->createPodcastEpisode('vor-with-rds-article', null, false),
                 $this->createPodcastEpisode('vor-with-rds-article', '2030-01-02T00:00:00Z', false),
             ],
-            'application/vnd.elife.press-package+json; version=3' => [
+            'application/vnd.elife.press-package+json; version=4' => [
                 $this->createPressPackage('vor-with-rds-article', null, false),
                 $this->createPressPackage('vor-with-rds-article', '2030-01-02T00:00:00Z', false),
             ],
@@ -217,7 +217,7 @@ final class StatusDateOverrideMiddlewareTest extends KernelTestCase
                     ],
                 ],
             ],
-            'application/vnd.elife.recommendations+json; version=2' => [
+            'application/vnd.elife.recommendations+json; version=3' => [
                 [
                     'total' => 2,
                     'items' => [
@@ -233,7 +233,7 @@ final class StatusDateOverrideMiddlewareTest extends KernelTestCase
                     ],
                 ],
             ],
-            'application/vnd.elife.search+json; version=1;' => [
+            'application/vnd.elife.search+json; version=2;' => [
                 [
                     'total' => 2,
                     'items' => [
@@ -244,6 +244,7 @@ final class StatusDateOverrideMiddlewareTest extends KernelTestCase
                     'types' => [
                         'correction' => 0,
                         'editorial' => 0,
+                        'expression-concern' => 0,
                         'feature' => 0,
                         'insight' => 0,
                         'research-advance' => 0,
@@ -261,6 +262,7 @@ final class StatusDateOverrideMiddlewareTest extends KernelTestCase
                         'interview' => 0,
                         'labs-post' => 0,
                         'podcast-episode' => 0,
+                        'reviewed-preprint' => 0,
                     ],
                 ],
                 [
@@ -273,6 +275,7 @@ final class StatusDateOverrideMiddlewareTest extends KernelTestCase
                     'types' => [
                         'correction' => 0,
                         'editorial' => 0,
+                        'expression-concern' => 0,
                         'feature' => 0,
                         'insight' => 0,
                         'research-advance' => 0,
@@ -290,6 +293,7 @@ final class StatusDateOverrideMiddlewareTest extends KernelTestCase
                         'interview' => 0,
                         'labs-post' => 0,
                         'podcast-episode' => 0,
+                        'reviewed-preprint' => 0,
                     ],
                 ],
             ],
@@ -309,6 +313,7 @@ final class StatusDateOverrideMiddlewareTest extends KernelTestCase
             'published' => '2010-01-01T00:00:00Z',
             'versionDate' => '2010-01-01T00:00:00Z',
             'statusDate' => $newStatusDate ?? '2010-01-01T00:00:00Z',
+            'reviewedDate' => '2010-01-01T00:00:00Z',
             'volume' => 1,
             'elocationId' => 'e00001',
             'copyright' => [

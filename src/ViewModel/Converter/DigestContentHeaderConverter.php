@@ -6,7 +6,6 @@ use eLife\ApiSdk\Model\Digest;
 use eLife\Journal\Helper\LicenceUri;
 use eLife\Patterns\ViewModel;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
-use function strip_tags;
 
 final class DigestContentHeaderConverter implements ViewModelConverter
 {
@@ -32,7 +31,7 @@ final class DigestContentHeaderConverter implements ViewModelConverter
 
         return new ViewModel\ContentHeaderNew(
             $object->getTitle(),
-            true, null, $object->getImpactStatement(), true,
+            false, true, null, $object->getImpactStatement(), true,
             new ViewModel\Breadcrumb([
                 new ViewModel\Link(
                     'Magazine',
@@ -44,11 +43,7 @@ final class DigestContentHeaderConverter implements ViewModelConverter
                 ),
             ]),
             [], null, null, null, null,
-            new ViewModel\SocialMediaSharersNew(
-                strip_tags($object->getTitle()),
-                $this->urlGenerator->generate('digest', [$object], UrlGeneratorInterface::ABSOLUTE_URL),
-                false
-            ),
+            null,
             !empty($context['metrics']) ? ViewModel\ContextualData::withMetrics($context['metrics']) : null,
             null,
             $meta,

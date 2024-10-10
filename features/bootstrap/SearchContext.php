@@ -20,6 +20,7 @@ final class SearchContext extends Context
 
     private static $researchTypes = [
         'correction',
+        'expression-concern',
         'registered-report',
         'replication-study',
         'research-advance',
@@ -30,6 +31,7 @@ final class SearchContext extends Context
         'scientific-correspondence',
         'short-report',
         'tools-resources',
+        'reviewed-preprint',
     ];
 
     private $query = [
@@ -111,6 +113,7 @@ final class SearchContext extends Context
                     $typeFilters = [
                         'correction' => 0,
                         'editorial' => 0,
+                        'expression-concern' => 0,
                         'feature' => 0,
                         'insight' => 0,
                         'research-advance' => 0,
@@ -128,6 +131,7 @@ final class SearchContext extends Context
                         'interview' => 0,
                         'labs-post' => 0,
                         'podcast-episode' => 0,
+                        'reviewed-preprint' => 0,
                     ];
 
                     foreach (array_keys($typeFilters) as $type) {
@@ -155,11 +159,11 @@ final class SearchContext extends Context
                         new Request(
                             'GET',
                             sprintf($uri, $thisKeyword, 1, 1),
-                            ['Accept' => 'application/vnd.elife.search+json; version=1']
+                            ['Accept' => 'application/vnd.elife.search+json; version=2']
                         ),
                         new Response(
                             200,
-                            ['Content-Type' => 'application/vnd.elife.search+json; version=1'],
+                            ['Content-Type' => 'application/vnd.elife.search+json; version=2'],
                             json_encode([
                                 'total' => count($articlesWithKeywordAndSubjects),
                                 'items' => count($articlesWithKeywordAndSubjects) ? [$articlesWithKeywordAndSubjects[0]] : [],
@@ -180,11 +184,11 @@ final class SearchContext extends Context
                             new Request(
                                 'GET',
                                 sprintf($uri, $thisKeyword, $i + 1, $chunk),
-                                ['Accept' => 'application/vnd.elife.search+json; version=1']
+                                ['Accept' => 'application/vnd.elife.search+json; version=2']
                             ),
                             new Response(
                                 200,
-                                ['Content-Type' => 'application/vnd.elife.search+json; version=1'],
+                                ['Content-Type' => 'application/vnd.elife.search+json; version=2'],
                                 json_encode([
                                     'total' => count($articlesWithKeywordAndSubjects),
                                     'items' => $articleChunk,
@@ -215,11 +219,11 @@ final class SearchContext extends Context
             new Request(
                 'GET',
                 'http://api.elifesciences.org/articles/00001',
-                ['Accept' => 'application/vnd.elife.article-poa+json; version=3, application/vnd.elife.article-vor+json; version=6']
+                ['Accept' => 'application/vnd.elife.article-poa+json; version=4, application/vnd.elife.article-vor+json; version=8']
             ),
             new Response(
                 200,
-                ['Content-Type' => 'application/vnd.elife.article-poa+json; version=3'],
+                ['Content-Type' => 'application/vnd.elife.article-poa+json; version=4'],
                 json_encode([
                     'status' => 'poa',
                     'stage' => 'published',
@@ -362,12 +366,12 @@ final class SearchContext extends Context
         $articles = $this->filterArticlesContainingKeyword($keyword, $this->articles);
 
         $this->spin(function () use ($number, $articles) {
-            $this->assertSession()->elementsCount('css', '.message-bar:contains("'.count($articles).' results found") + * > .listing-list > .listing-list__item', $number);
+            $this->assertSession()->elementsCount('css', '.message-bar:contains("'.count($articles).' results found") + .listing-list > .listing-list__item', $number);
 
             for ($i = 0; $i < $number; ++$i) {
                 $this->assertSession()->elementContains(
                     'css',
-                    '.message-bar:contains("'.count($articles).' results found") + * > .listing-list > .listing-list__item:nth-child('.($i + 1).')',
+                    '.message-bar:contains("'.count($articles).' results found") + .listing-list > .listing-list__item:nth-child('.($i + 1).')',
                     $articles[$i]['title']
                 );
             }
@@ -385,12 +389,12 @@ final class SearchContext extends Context
         $articles = $this->filterArticlesWithASubject($subjects, $this->filterArticlesContainingKeyword($keyword, $this->articles));
 
         $this->spin(function () use ($number, $articles) {
-            $this->assertSession()->elementsCount('css', '.message-bar:contains("'.count($articles).' results found") + * > .listing-list > .listing-list__item', $number);
+            $this->assertSession()->elementsCount('css', '.message-bar:contains("'.count($articles).' results found") + .listing-list > .listing-list__item', $number);
 
             for ($i = 0; $i < $number; ++$i) {
                 $this->assertSession()->elementContains(
                     'css',
-                    '.message-bar:contains("'.count($articles).' results found") + * > .listing-list > .listing-list__item:nth-child('.($i + 1).')',
+                    '.message-bar:contains("'.count($articles).' results found") + .listing-list > .listing-list__item:nth-child('.($i + 1).')',
                     $articles[$i]['title']
                 );
             }
@@ -405,12 +409,12 @@ final class SearchContext extends Context
         $articles = $this->filterArticlesByType($this->createContentTypeId($contentType), $this->filterArticlesContainingKeyword($keyword, $this->articles));
 
         $this->spin(function () use ($number, $articles) {
-            $this->assertSession()->elementsCount('css', '.message-bar:contains("'.count($articles).' results found") + * > .listing-list > .listing-list__item', $number);
+            $this->assertSession()->elementsCount('css', '.message-bar:contains("'.count($articles).' results found") + .listing-list > .listing-list__item', $number);
 
             for ($i = 0; $i < $number; ++$i) {
                 $this->assertSession()->elementContains(
                     'css',
-                    '.message-bar:contains("'.count($articles).' results found") + * > .listing-list > .listing-list__item:nth-child('.($i + 1).')',
+                    '.message-bar:contains("'.count($articles).' results found") + .listing-list > .listing-list__item:nth-child('.($i + 1).')',
                     $articles[$i]['title']
                 );
             }
@@ -425,12 +429,12 @@ final class SearchContext extends Context
         $articles = $this->filterArticlesByType($this->createContentTypeId($contentType), $this->filterArticlesWithSubject($subject, $this->filterArticlesContainingKeyword($keyword, $this->articles)));
 
         $this->spin(function () use ($number, $articles) {
-            $this->assertSession()->elementsCount('css', '.message-bar:contains("'.count($articles).' results found") + * > .listing-list > .listing-list__item', $number);
+            $this->assertSession()->elementsCount('css', '.message-bar:contains("'.count($articles).' results found") + .listing-list > .listing-list__item', $number);
 
             for ($i = 0; $i < $number; ++$i) {
                 $this->assertSession()->elementContains(
                     'css',
-                    '.message-bar:contains("'.count($articles).' results found") + * > .listing-list > .listing-list__item:nth-child('.($i + 1).')',
+                    '.message-bar:contains("'.count($articles).' results found") + .listing-list > .listing-list__item:nth-child('.($i + 1).')',
                     $articles[$i]['title']
                 );
             }

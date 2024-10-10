@@ -244,6 +244,31 @@ abstract class Controller implements ContainerAwareInterface
         );
     }
 
+    final protected function magazinePageArguments($arguments, $type) {
+        return [
+            'hasSocialMedia' => true,
+            'socialMediaSharersLinks' => all(['item' => $arguments['item']])
+                ->then(function (array $parts) use ($type) {
+                    $context['variant'] = $type;
+                    return $this->convertTo($parts['item'], ViewModel\SocialMediaSharersNew::class, $context);
+                }),
+            'contextualDataMetrics' => isset($arguments['pageViews']) ? all(['pageViews' => $arguments['pageViews']])
+                ->then(function (array $parts) {
+                    /** @var int|null $pageViews */
+                    $pageViews = $parts['pageViews'];
+
+                    $metrics = [];
+
+                    if (null !== $pageViews && $pageViews > 0) {
+                        $metrics[] = sprintf('<span class="contextual-data__counter">%s</span> %s', number_format($pageViews), 'views');
+                    }
+
+                    return $metrics;
+                }) : null
+
+        ];
+    }
+
     final protected function defaultPageArguments(Request $request, PromiseInterface $item = null) : array
     {
         if ($this->isGranted('IS_AUTHENTICATED_REMEMBERED')) {
@@ -260,7 +285,7 @@ abstract class Controller implements ContainerAwareInterface
         return [
             'header' => all(['item' => promise_for($item), 'profile' => promise_for($profile ?? null)])
                 ->then(function (array $parts) {
-                    return $this->get('elife.journal.view_model.factory.site_header')->createSiteHeader($parts['item'], $parts['profile']);
+                    return $this->get('elife.journal.view_model.factory.site_header')->createSiteHeader($parts['item']);
                 }),
             'infoBars' => [],
             'callsToAction' => $this->getCallsToAction($request),

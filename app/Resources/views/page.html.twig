@@ -116,8 +116,6 @@
             {% set description = item.impactStatement %}
         {% elseif contentHeader is defined and contentHeader.impactStatement is defined %}
             {% set description = contentHeader.impactStatement %}
-        {% elseif leadParas is defined and leadParas %}
-            {% set description = render_pattern(leadParas) %}
         {% endif %}
         {% if description is defined %}
             <meta property="og:description" content="{{ description|striptags|single_line|trim }}">
@@ -172,10 +170,6 @@
 
     {% endblock %}
 
-    <!--[if lt IE 9]>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5shiv/3.7.3/html5shiv.min.js"></script>
-    <![endif]-->
-
     <script type="text/plain" data-cookieconsent="statistics,marketing">
         {% if gtm_id %}
         window.gtmDataLayer = window.gtmDataLayer || [];
@@ -222,7 +216,7 @@
         </noscript>
     {% endif %}
 
-    <div class="global-wrapper{% if isMagazine ?? false %} page--magazine{% endif %}{% if clean ?? false %} clean{% endif %}" data-behaviour="FragmentHandler Math{% if hypothesis ?? false %} HypothesisLoader{% endif %}"
+    <div class="global-wrapper{% if isMagazine ?? false %} page--magazine{% endif %}{% if hasSocialMedia ?? false %} social-media-page--wrapper{% endif %}{% if clean ?? false %} clean{% endif %}" data-behaviour="FragmentHandler Math{% if hypothesis ?? false %} HypothesisLoader{% endif %}"
         {% if item is defined and item is not null %}
             data-item-type="{% if item.type is defined %}{{ item.type }}{% else %}{{ item.identifier.type }}{% endif %}"
         {% endif %}
@@ -244,8 +238,17 @@
                 {% endfor %}
             {% endif %}
 
+            {# Ensure dismissible infoBars appear after other types and announcement infoBars do not appear here. #}
             {% for infoBar in infoBars %}
-                {{ render_pattern(infoBar) }}
+                {% if infoBar.type not in ['dismissible', 'announcement'] %}
+                    {{ render_pattern(infoBar) }}
+                {% endif %}
+            {% endfor %}
+
+            {% for infoBar in infoBars %}
+                {% if infoBar.type == 'dismissible' %}
+                    {{ render_pattern(infoBar) }}
+                {% endif %}
             {% endfor %}
 
             {% block pre_body %}{% endblock %}

@@ -3,8 +3,10 @@
 namespace eLife\Journal\ViewModel\Converter;
 
 use eLife\ApiSdk\Model\ArticleVersion;
+use eLife\ApiSdk\Model\ArticleVoR;
 use eLife\ApiSdk\Model\Block\Paragraph;
 use eLife\Journal\Helper\CanConvertContent;
+use eLife\Journal\Helper\DoiVersion;
 use eLife\Patterns\PatternRenderer;
 use eLife\Patterns\ViewModel;
 use eLife\Patterns\ViewModel\Button;
@@ -31,6 +33,8 @@ final class ArticleModalConverter implements ViewModelConverter
     public function convert($object, string $viewModel = null, array $context = []) : ViewModel
     {
         if ('social' === ($context['type'] ?? 'social')) {
+            $doi = (string) new DoiVersion($object);
+
             $body = [
                 ViewModel\TextField::textInput(
                     new ViewModel\FormLabel('Doi', true),
@@ -42,12 +46,16 @@ final class ArticleModalConverter implements ViewModelConverter
                     null,
                     null,
                     null,
-                    "https://doi.org/{$object->getDoi()}"
+                    "https://doi.org/{$doi}"
                 ),
-                ViewModel\Button::clipboard('Copy to clipboard', "https://doi.org/{$object->getDoi()}"),
+                ViewModel\Button::clipboard('Copy to clipboard', "https://doi.org/{$doi}"),
                 new ViewModel\SocialMediaSharersNew(
                     strip_tags($object->getFullTitle()),
-                    "https://doi.org/{$object->getDoi()}"
+                    "https://doi.org/{$doi}",
+                    true,
+                    true,
+                    false,
+                    true
                 ),
             ];
 
@@ -55,12 +63,6 @@ final class ArticleModalConverter implements ViewModelConverter
             return ViewModel\ModalWindow::create('Share this article', $this->patternRenderer->render(...$body), null, 'modalContentShare');
         } else {
             $reference = $this->patternRenderer->render($this->convertTo($object, ViewModel\Reference::class));
-
-            $buttonCollection = [];
-
-            if ($context['clipboard'] ?? false) {
-                $buttonCollection[] = Button::clipboard('Copy to clipboard', $context['clipboard']);
-            }
 
             $body = [
                 new ViewModel\ButtonCollection(
@@ -71,6 +73,7 @@ final class ArticleModalConverter implements ViewModelConverter
                     ])
                 ),
             ];
+
             return ViewModel\ModalWindow::create('Cite this article', $reference.$this->patternRenderer->render(...$body), null, 'modalContentCitations');
         }
     }

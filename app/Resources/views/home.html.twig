@@ -12,17 +12,15 @@
 
 {% block body %}
 
-    {% if carousel %}
+    {% if heroBanner is defined and heroBanner %}
 
-        {{ render_pattern(carousel) }}
+        <div class="wrapper">
+
+            {{ render_pattern(heroBanner) }}
+
+        </div>
 
     {% endif %}
-
-    <div class="wrapper">
-
-        {{ render_pattern(leadParas) }}
-
-    </div>
 
     {% include 'calls-to-action.html.twig' %}
 
@@ -31,6 +29,16 @@
         <div class="wrapper">
 
             {{ render_pattern(subjectsLink) }}
+
+        </div>
+
+    {% endif %}
+
+    {% if highlights is defined and highlights %}
+
+        <div class="wrapper">
+
+            {{ render_pattern(highlights) }}
 
         </div>
 

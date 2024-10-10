@@ -148,7 +148,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                     ],
                 ],
             ],
-            'application/vnd.elife.article-related+json; version=1' => [
+            'application/vnd.elife.article-related+json; version=2' => [
                 [
                     $this->createArticlePoA(),
                     $this->createArticleVoR(),
@@ -158,19 +158,15 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                     $this->createArticleVoR(true),
                 ],
             ],
-            'application/vnd.elife.article-poa+json; version=2' => [
-                $this->createArticlePoA(false, false),
-                $this->createArticlePoA(true, false),
-            ],
             'application/vnd.elife.article-poa+json; version=3' => [
                 $this->createArticlePoA(false, false),
                 $this->createArticlePoA(true, false),
             ],
-            'application/vnd.elife.article-vor+json; version=5' => [
-                $this->createArticleVoR(false, false),
-                $this->createArticleVoR(true, false),
+            'application/vnd.elife.article-poa+json; version=4' => [
+                $this->createArticlePoA(false, false),
+                $this->createArticlePoA(true, false),
             ],
-            'application/vnd.elife.article-vor+json; version=6' => [
+            'application/vnd.elife.article-vor+json; version=7' => [
                 $this->createArticleVoR(false, false),
                 $this->createArticleVoR(true, false),
             ],
@@ -192,7 +188,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                     ],
                 ],
             ],
-            'application/vnd.elife.collection+json; version=1' => [
+            'application/vnd.elife.collection+json; version=3' => [
                 $this->createCollection(false, false),
                 $this->createCollection(true, false),
             ],
@@ -290,7 +286,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                 $this->createPodcastEpisode(false, false),
                 $this->createPodcastEpisode(true, false),
             ],
-            'application/vnd.elife.press-package+json; version=3' => [
+            'application/vnd.elife.press-package+json; version=4' => [
                 $this->createPressPackage(false, false),
                 $this->createPressPackage(true, false),
             ],
@@ -308,7 +304,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                     ],
                 ],
             ],
-            'application/vnd.elife.recommendations+json; version=1' => [
+            'application/vnd.elife.recommendations+json; version=3' => [
                 [
                     'total' => 2,
                     'items' => [
@@ -324,7 +320,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                     ],
                 ],
             ],
-            'application/vnd.elife.search+json; version=1; with new subject' => [
+            'application/vnd.elife.search+json; version=2; with new subject' => [
                 [
                     'total' => 2,
                     'items' => [
@@ -339,6 +335,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                     'types' => [
                         'correction' => 0,
                         'editorial' => 0,
+                        'expression-concern' => 0,
                         'feature' => 0,
                         'insight' => 0,
                         'research-advance' => 0,
@@ -356,6 +353,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                         'interview' => 0,
                         'labs-post' => 0,
                         'podcast-episode' => 0,
+                        'reviewed-preprint' => 0,
                     ],
                 ],
                 [
@@ -371,6 +369,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                     'types' => [
                         'correction' => 0,
                         'editorial' => 0,
+                        'expression-concern' => 0,
                         'feature' => 0,
                         'insight' => 0,
                         'research-advance' => 0,
@@ -388,10 +387,11 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                         'interview' => 0,
                         'labs-post' => 0,
                         'podcast-episode' => 0,
+                        'reviewed-preprint' => 0,
                     ],
                 ],
             ],
-            'application/vnd.elife.search+json; version=1; without new subject' => [
+            'application/vnd.elife.search+json; version=2; without new subject' => [
                 [
                     'total' => 2,
                     'items' => [
@@ -405,6 +405,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                     'types' => [
                         'correction' => 0,
                         'editorial' => 0,
+                        'expression-concern' => 0,
                         'feature' => 0,
                         'insight' => 0,
                         'research-advance' => 0,
@@ -422,6 +423,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                         'interview' => 0,
                         'labs-post' => 0,
                         'podcast-episode' => 0,
+                        'reviewed-preprint' => 0,
                     ],
                 ],
                 [
@@ -437,6 +439,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                     'types' => [
                         'correction' => 0,
                         'editorial' => 0,
+                        'expression-concern' => 0,
                         'feature' => 0,
                         'insight' => 0,
                         'research-advance' => 0,
@@ -454,6 +457,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
                         'interview' => 0,
                         'labs-post' => 0,
                         'podcast-episode' => 0,
+                        'reviewed-preprint' => 0,
                     ],
                 ],
             ],
@@ -523,6 +527,7 @@ final class SubjectRewritingMiddlewareTest extends KernelTestCase
             'published' => '2010-01-01T00:00:00Z',
             'versionDate' => '2010-01-01T00:00:00Z',
             'statusDate' => '2010-01-01T00:00:00Z',
+            'reviewedDate' => '2010-01-01T00:00:00Z',
             'volume' => 1,
             'elocationId' => 'e00001',
             'copyright' => [

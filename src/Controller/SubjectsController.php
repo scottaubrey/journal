@@ -23,6 +23,7 @@ use eLife\Patterns\ViewModel\ListingTeasers;
 use eLife\Patterns\ViewModel\ProfileSnippet;
 use eLife\Patterns\ViewModel\SeeMoreLink;
 use eLife\Patterns\ViewModel\Teaser;
+use eLife\Patterns\ViewModel\ViewSelector;
 use Pagerfanta\Pagerfanta;
 use Symfony\Component\HttpFoundation\RedirectResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -40,7 +41,10 @@ final class SubjectsController extends Controller
 
         $arguments['title'] = 'Research categories';
 
-        $arguments['contentHeader'] = new ContentHeaderSimple('Browse our research categories');
+        $arguments['contentHeader'] = new ContentHeaderSimple('Research Categories',
+            'The latest articles and peer reviewed preprints in Life Sciences and Medicine. <br />
+            Browse our research categories or <a href="'.$this->get('router')->generate('content-alerts').'">subscribe to email alerts</a>.'
+        );
 
         $arguments['subjects'] = $this->get('elife.api_sdk.subjects')
             ->reverse()
@@ -77,9 +81,25 @@ final class SubjectsController extends Controller
 
         $arguments['id'] = $id;
 
+        $searchTypes = [
+            'research-article',
+            'research-advance',
+            'research-communication',
+            'review-article',
+            'scientific-correspondence',
+            'short-report',
+            'tools-resources',
+            'replication-study',
+            'editorial',
+            'insight',
+            'feature',
+            'collection',
+            'reviewed-preprint',
+        ];
+
         $latestArticles = promise_for($this->get('elife.api_sdk.search')
             ->forSubject($id)
-            ->forType('research-article', 'research-advance', 'research-communication', 'review-article', 'scientific-correspondence', 'short-report', 'tools-resources', 'replication-study', 'editorial', 'insight', 'feature', 'collection')
+            ->forType(...$searchTypes)
             ->sortBy('date'))
             ->then(function (Sequence $sequence) use ($page, $perPage) {
                 $pagerfanta = new Pagerfanta(new SequenceAdapter($sequence, $this->willConvertTo(Teaser::class)));
@@ -156,6 +176,14 @@ final class SubjectsController extends Controller
                 );
             }))
             ->otherwise($this->softFailure("Failed to load senior editors for {$arguments['id']}"));
+
+        $arguments['viewSelector'] = new ViewSelector(
+            new Link('Latest articles', '#primaryListing'),
+            [],
+            new Link('Highlights', '#secondaryListing'),
+            false,
+            true
+        );
 
         return new Response($this->get('templating')->render('::subject.html.twig', $arguments));
     }

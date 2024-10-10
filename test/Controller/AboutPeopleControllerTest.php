@@ -17,6 +17,24 @@ final class AboutPeopleControllerTest extends PageTestCase
         $crawler = $client->request('GET', $this->getUrl());
 
         $this->assertSame(200, $client->getResponse()->getStatusCode());
+
+        $this->assertEquals([
+            [
+                'About',
+                '/about',
+            ],
+            [
+                'Editors and people',
+                null,
+            ],
+        ], array_map(function ($item) {
+            $link = $item->getElementsByTagName('a')->item(0);
+            return [
+                trim($item->textContent),
+                $link ? $link->attributes->getNamedItem('href')->nodeValue : null,
+            ];
+        }, $crawler->filter('.breadcrumb-item')->getIterator()->getArrayCopy()));
+
         $this->assertSame('Leadership team', $crawler->filter('.content-header__title')->text());
     }
 
@@ -182,6 +200,19 @@ final class AboutPeopleControllerTest extends PageTestCase
         $this->assertEmpty($crawler->filter('meta[name="dc.description"]'));
         $this->assertEmpty($crawler->filter('meta[name="dc.date"]'));
         $this->assertEmpty($crawler->filter('meta[name="dc.rights"]'));
+    }
+
+    /**
+     * @test
+     */
+    public function it_does_not_display_announcement_info_bar()
+    {
+        $client = static::createClient();
+
+        $crawler = $client->request('GET', $this->getUrl());
+
+        $this->assertSame(200, $client->getResponse()->getStatusCode());
+        $this->assertEmpty($crawler->filter('.content-container .info-bar--announcement .info-bar__text'));
     }
 
     protected function getUrl() : string

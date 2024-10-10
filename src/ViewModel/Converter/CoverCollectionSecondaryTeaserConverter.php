@@ -4,6 +4,7 @@ namespace eLife\Journal\ViewModel\Converter;
 
 use eLife\ApiSdk\Model\Collection;
 use eLife\ApiSdk\Model\Cover;
+use eLife\Journal\Helper\ModelName;
 use eLife\Patterns\ViewModel;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
 
@@ -43,9 +44,9 @@ final class CoverCollectionSecondaryTeaserConverter implements ViewModelConverte
                 $this->viewModelConverter->convert($object->getBanner(), null, ['width' => 72, 'height' => 72])
             ),
             ViewModel\TeaserFooter::forNonArticle(
-                ViewModel\Meta::withLink(
-                    new ViewModel\Link('Collection', $this->urlGenerator->generate('collections')),
-                    $this->simpleDate($collection, $context)
+                ViewModel\Meta::withLink(new ViewModel\Link(
+                    ModelName::singular('collection'),
+                    $this->urlGenerator->generate('collections')), $this->simpleDate($collection, $context)
                 )
             )
         );

@@ -6,6 +6,7 @@ use eLife\ApiSdk\Model\ArticleVersion;
 use eLife\ApiSdk\Model\HasImpactStatement;
 use eLife\ApiSdk\Model\Subject;
 use eLife\Journal\Helper\CanConvertContent;
+use eLife\Journal\Helper\DoiVersion;
 use eLife\Journal\Helper\LicenceUri;
 use eLife\Journal\Helper\ModelName;
 use eLife\Patterns\ViewModel;
@@ -33,7 +34,9 @@ final class ArticleContentHeaderConverter implements ViewModelConverter
     {
         $isMagazine = $context['isMagazine'] ?? false;
 
-        $breadcrumb = ($isMagazine || 'feature' === $object->getType()) ? [
+        $isMagazineOrFeature = ($isMagazine || 'feature' === $object->getType());
+
+        $breadcrumb = $isMagazineOrFeature ? [
             new ViewModel\Link(
                 'Magazine',
                 $this->urlGenerator->generate('magazine')
@@ -59,8 +62,11 @@ final class ArticleContentHeaderConverter implements ViewModelConverter
             $meta = null;
         }
 
+        $doi = (string) new DoiVersion($object);
+
         return new ViewModel\ContentHeaderNew(
             $object->getFullTitle(),
+            !$isMagazineOrFeature,
             null,
             null,
             $impactStatement,
@@ -73,12 +79,14 @@ final class ArticleContentHeaderConverter implements ViewModelConverter
             '#cite-this-article',
             new ViewModel\SocialMediaSharersNew(
                 strip_tags($object->getFullTitle()),
-                "https://doi.org/{$object->getDoi()}"
+                "https://doi.org/{$doi}",
+                true,
+                true
             ),
             !empty($context['metrics']) ? ViewModel\ContextualData::withMetrics($context['metrics']) : null,
             null,
             $meta,
-            $object->getDoi() ? new ViewModel\Doi($object->getDoi()) : null,
+            new ViewModel\Doi($doi),
             LicenceUri::forCode($object->getCopyright()->getLicense())
         );
     }

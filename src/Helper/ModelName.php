@@ -15,6 +15,10 @@ final class ModelName
             'singular' => 'Editorial',
             'plural' => 'Editorials',
         ],
+        'expression-concern' => [
+            'singular' => 'Expression of Concern',
+            'plural' => 'Expressions of Concern',
+        ],
         'feature' => [
             'singular' => 'Feature Article',
             'plural' => 'Feature Articles',
@@ -102,6 +106,10 @@ final class ModelName
         'promotional-collection' => [
             'singular' => 'Highlight',
             'plural' => 'Highlights',
+        ],
+        'reviewed-preprint' => [
+            'singular' => 'Reviewed Preprint',
+            'plural' => 'Reviewed Preprints',
         ],
     ];
 

@@ -68,7 +68,7 @@ final class WhoWeWorkWithControllerTest extends PageTestCase
                     'eJournalPress',
                 ],
                 [
-                    'http://www.exeterpremedia.com/',
+                    'https://www.kriyadocs.com/',
                     'Exeter Premedia Services',
                 ],
                 [
@@ -96,10 +96,6 @@ final class WhoWeWorkWithControllerTest extends PageTestCase
                     'The Naked Scientists',
                 ],
                 [
-                    'https://newrelic.com/',
-                    'New Relic',
-                ],
-                [
                     'https://publons.com/',
                     'Publons',
                 ],
@@ -114,6 +110,10 @@ final class WhoWeWorkWithControllerTest extends PageTestCase
                 [
                     'https://www.cnki.net/',
                     'CNKI',
+                ],
+                [
+                    'https://doaj.org/toc/2050-084X',
+                    'DOAJ Seal',
                 ],
                 [
                     'https://europepmc.org/',
@@ -180,7 +180,7 @@ final class WhoWeWorkWithControllerTest extends PageTestCase
                     'Initiative for Open Citations',
                 ],
                 [
-                    'http://jats4r.org/',
+                    'https://jats4r.niso.org/',
                     'JATS for Reuse',
                 ],
                 [

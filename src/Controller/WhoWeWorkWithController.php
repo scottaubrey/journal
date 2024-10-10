@@ -94,7 +94,7 @@ final class WhoWeWorkWithController extends Controller
                 'name' => 'Exeter Premedia Services',
                 'filename' => 'exeter',
                 'type' => 'image/png',
-                'uri' => 'http://www.exeterpremedia.com/',
+                'uri' => 'https://www.kriyadocs.com/',
             ],
             [
                 'name' => 'Fastly',
@@ -133,12 +133,6 @@ final class WhoWeWorkWithController extends Controller
                 'uri' => 'https://www.thenakedscientists.com/',
             ],
             [
-                'name' => 'New Relic',
-                'filename' => 'new-relic-logo',
-                'type' => 'image/svg+xml',
-                'uri' => 'https://newrelic.com/',
-            ],
-            [
                 'name' => 'Publons',
                 'filename' => 'publons',
                 'type' => 'image/svg+xml',
@@ -164,6 +158,12 @@ final class WhoWeWorkWithController extends Controller
                 'filename' => 'cnki',
                 'type' => 'image/png',
                 'uri' => 'https://www.cnki.net/',
+            ],
+            [
+                'name' => 'DOAJ Seal',
+                'filename' => 'doaj-seal',
+                'type' => 'image/svg+xml',
+                'uri' => 'https://doaj.org/toc/2050-084X',
             ],
             [
                 'name' => 'Europe PubMed Central',
@@ -268,7 +268,7 @@ final class WhoWeWorkWithController extends Controller
                 'name' => 'JATS for Reuse',
                 'filename' => 'jats4r',
                 'type' => 'image/png',
-                'uri' => 'http://jats4r.org/',
+                'uri' => 'https://jats4r.niso.org/',
             ],
             [
                 'name' => 'Open Access Scholarly Publishers Association',

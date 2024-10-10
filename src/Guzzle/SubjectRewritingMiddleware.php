@@ -91,23 +91,25 @@ final class SubjectRewritingMiddleware
                     case 'application/vnd.elife.collection-list+json; version=1':
                     case 'application/vnd.elife.community-list+json; version=1':
                     case 'application/vnd.elife.press-package-list+json; version=1':
-                    case 'application/vnd.elife.recommendations+json; version=1':
+                    case 'application/vnd.elife.recommendations+json; version=3':
+                    case 'application/vnd.elife.reviewed-preprint-list+json; version=1':
                         $data['items'] = $this->updateItems($data['items']);
                         break;
 
-                    case 'application/vnd.elife.article-related+json; version=1':
+                    case 'application/vnd.elife.article-related+json; version=2':
                         $data = $this->updateItems($data);
                         break;
 
-                    case 'application/vnd.elife.article-poa+json; version=2':
                     case 'application/vnd.elife.article-poa+json; version=3':
-                    case 'application/vnd.elife.article-vor+json; version=5':
-                    case 'application/vnd.elife.article-vor+json; version=6':
+                    case 'application/vnd.elife.article-poa+json; version=4':
+                    case 'application/vnd.elife.article-vor+json; version=7':
+                    case 'application/vnd.elife.article-vor+json; version=8':
                     case 'application/vnd.elife.blog-article+json; version=2':
+                    case 'application/vnd.elife.reviewed-preprint+json; version=1':
                         $data = $this->updateItem($data);
                         break;
 
-                    case 'application/vnd.elife.collection+json; version=1':
+                    case 'application/vnd.elife.collection+json; version=3':
                         $data = $this->updateItem($data);
                         $data['content'] = $this->updateItems($data['content']);
                         $data['relatedContent'] = $this->updateItems($data['relatedContent'] ?? []);
@@ -138,12 +140,12 @@ final class SubjectRewritingMiddleware
                         $data = $this->updatePerson($data);
                         break;
 
-                    case 'application/vnd.elife.press-package+json; version=3':
+                    case 'application/vnd.elife.press-package+json; version=4':
                         $data = $this->updateItem($data);
                         $data['relatedContent'] = $this->updateItems($data['relatedContent'] ?? []);
                         break;
 
-                    case 'application/vnd.elife.search+json; version=1':
+                    case 'application/vnd.elife.search+json; version=2':
                         $data['items'] = $this->updateItems($data['items']);
                         $data['subjects'] = $this->updateSearchSubjects($data['subjects'] ?? []);
                         break;

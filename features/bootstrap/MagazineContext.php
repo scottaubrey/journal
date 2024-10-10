@@ -41,11 +41,11 @@ final class MagazineContext extends Context
             new Request(
                 'GET',
                 'http://api.elifesciences.org/search?for=&page=1&per-page=1&sort=date&order=desc&type[]=editorial&type[]=insight&type[]=feature&type[]=collection&type[]=interview&type[]=podcast-episode&use-date=default',
-                ['Accept' => 'application/vnd.elife.search+json; version=1']
+                ['Accept' => 'application/vnd.elife.search+json; version=2']
             ),
             new Response(
                 200,
-                ['Content-Type' => 'application/vnd.elife.search+json; version=1'],
+                ['Content-Type' => 'application/vnd.elife.search+json; version=2'],
                 json_encode([
                     'total' => $number,
                     'items' => [$articles[0]],
@@ -53,6 +53,7 @@ final class MagazineContext extends Context
                     'types' => [
                         'correction' => 0,
                         'editorial' => 0,
+                        'expression-concern' => 0,
                         'feature' => 0,
                         'insight' => 0,
                         'research-advance' => 0,
@@ -70,6 +71,7 @@ final class MagazineContext extends Context
                         'interview' => $this->numberOfArticles,
                         'labs-post' => 0,
                         'podcast-episode' => 0,
+                        'reviewed-preprint' => 0,
                     ],
                 ])
             )
@@ -82,11 +84,11 @@ final class MagazineContext extends Context
                 new Request(
                     'GET',
                     "http://api.elifesciences.org/search?for=&page=$page&per-page=$chunk&sort=date&order=desc&type[]=editorial&type[]=insight&type[]=feature&type[]=collection&type[]=interview&type[]=podcast-episode&use-date=default",
-                    ['Accept' => 'application/vnd.elife.search+json; version=1']
+                    ['Accept' => 'application/vnd.elife.search+json; version=2']
                 ),
                 new Response(
                     200,
-                    ['Content-Type' => 'application/vnd.elife.search+json; version=1'],
+                    ['Content-Type' => 'application/vnd.elife.search+json; version=2'],
                     json_encode([
                         'total' => $number,
                         'items' => $articleChunk,
@@ -94,6 +96,7 @@ final class MagazineContext extends Context
                         'types' => [
                             'correction' => 0,
                             'editorial' => 0,
+                            'expression-concern' => 0,
                             'feature' => 0,
                             'insight' => 0,
                             'research-advance' => 0,
@@ -111,6 +114,7 @@ final class MagazineContext extends Context
                             'interview' => $this->numberOfArticles,
                             'labs-post' => 0,
                             'podcast-episode' => 0,
+                            'reviewed-preprint' => 0,
                         ],
                     ])
                 )
@@ -658,11 +662,11 @@ final class MagazineContext extends Context
                 new Request(
                     'GET',
                     'http://api.elifesciences.org/search?for=&page=1&per-page=10&sort=date&order=desc&type[]=editorial&type[]=insight&type[]=feature&type[]=collection&type[]=interview&type[]=podcast-episode&use-date=default',
-                    ['Accept' => 'application/vnd.elife.search+json; version=1']
+                    ['Accept' => 'application/vnd.elife.search+json; version=2']
                 ),
                 new Response(
                     200,
-                    ['Content-Type' => 'application/vnd.elife.search+json; version=1'],
+                    ['Content-Type' => 'application/vnd.elife.search+json; version=2'],
                     json_encode([
                         'total' => 0,
                         'items' => [],
@@ -670,6 +674,7 @@ final class MagazineContext extends Context
                         'types' => [
                             'correction' => 0,
                             'editorial' => 0,
+                            'expression-concern' => 0,
                             'feature' => 0,
                             'insight' => 0,
                             'research-advance' => 0,
@@ -687,6 +692,7 @@ final class MagazineContext extends Context
                             'interview' => 0,
                             'labs-post' => 0,
                             'podcast-episode' => 0,
+                            'reviewed-preprint' => 0,
                         ],
                     ])
                 )

@@ -56,6 +56,80 @@ final class SubjectControllerTest extends PageTestCase
 
     /**
      * @test
+     */
+    public function it_has_a_view_selector_when_secondary_column_introduced()
+    {
+        $client = static::createClient();
+
+        $crawler = $client->request('GET', $this->getUrl().'?foo');
+
+        $this->assertSame(200, $client->getResponse()->getStatusCode());
+
+        $tabSelector = $crawler->filter('.button--switch-selector .view-selector__link');
+        $this->assertCount(0, $tabSelector);
+
+        $this->mockApiResponse(
+            new Request(
+                'GET',
+                'http://api.elifesciences.org/highlights/subject?page=1&per-page=3&order=desc',
+                ['Accept' => 'application/vnd.elife.highlight-list+json; version=3']
+            ),
+            new Response(
+                200,
+                ['Content-Type' => 'application/vnd.elife.highlight-list+json; version=3'],
+                json_encode([
+                    'total' => 1,
+                    'items' => [
+                        [
+                            'title' => 'Article highlight',
+                            'item' => [
+                                'status' => 'vor',
+                                'stage' => 'preview',
+                                'id' => '00001',
+                                'version' => 1,
+                                'type' => 'research-article',
+                                'doi' => '10.7554/eLife.00001',
+                                'title' => 'Article',
+                                'volume' => 1,
+                                'elocationId' => 'e00001',
+                                'copyright' => [
+                                    'license' => 'CC-BY-4.0',
+                                    'holder' => 'Bar',
+                                    'statement' => 'Copyright statement.',
+                                ],
+                                'subjects' => [
+                                    [
+                                        'id' => 'subject',
+                                        'name' => 'Subject',
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ])
+            )
+        );
+
+        $crawler = $client->request('GET', $this->getUrl().'?bar');
+
+        $this->assertSame(200, $client->getResponse()->getStatusCode());
+
+        $tabSelector = $crawler->filter('.button--switch-selector .view-selector__link');
+        $this->assertCount(2, $tabSelector);
+        $this->assertEquals([
+            [
+                'Latest articles',
+                '#primaryListing',
+            ],
+            [
+                'Highlights',
+                '#secondaryListing',
+            ],
+        ], $tabSelector->extract(['_text', 'href']));
+    }
+
+    /**
+     * @test
      * @dataProvider invalidPageProvider
      */
     public function it_displays_a_404_when_not_on_a_valid_page($page, callable $callable = null)
@@ -129,8 +203,8 @@ final class SubjectControllerTest extends PageTestCase
                     $this->mockApiResponse(
                         new Request(
                             'GET',
-                            'http://api.elifesciences.org/search?for=&page=1&per-page=1&sort=date&order=desc&subject[]=subject&type[]=research-article&type[]=research-communication&type[]=research-advance&type[]=review-article&type[]=scientific-correspondence&type[]=short-report&type[]=tools-resources&type[]=replication-study&type[]=editorial&type[]=insight&type[]=feature&type[]=collection&use-date=default',
-                            ['Accept' => 'application/vnd.elife.search+json; version=1']
+                            'http://api.elifesciences.org/search?for=&page=1&per-page=1&sort=date&order=desc&subject[]=subject&type[]=reviewed-preprint&type[]=research-article&type[]=research-communication&type[]=research-advance&type[]=review-article&type[]=scientific-correspondence&type[]=short-report&type[]=tools-resources&type[]=replication-study&type[]=editorial&type[]=insight&type[]=feature&type[]=collection&use-date=default',
+                            ['Accept' => 'application/vnd.elife.search+json; version=2']
                         ),
                         new Response(
                             404,
@@ -291,15 +365,15 @@ final class SubjectControllerTest extends PageTestCase
         static::mockApiResponse(
             new Request(
                 'GET',
-                'http://api.elifesciences.org/search?for=&page=1&per-page=10&sort=date&order=desc&subject[]=subject&type[]=research-article&type[]=research-communication&type[]=research-advance&type[]=review-article&type[]=scientific-correspondence&type[]=short-report&type[]=tools-resources&type[]=replication-study&type[]=editorial&type[]=insight&type[]=feature&type[]=collection&use-date=default',
+                'http://api.elifesciences.org/search?for=&page=1&per-page=10&sort=date&order=desc&subject[]=subject&type[]=reviewed-preprint&type[]=research-article&type[]=research-communication&type[]=research-advance&type[]=review-article&type[]=scientific-correspondence&type[]=short-report&type[]=tools-resources&type[]=replication-study&type[]=editorial&type[]=insight&type[]=feature&type[]=collection&use-date=default',
                 [
-                    'Accept' => 'application/vnd.elife.search+json; version=1',
+                    'Accept' => 'application/vnd.elife.search+json; version=2',
                 ]
             ),
             new Response(
                 200,
                 [
-                    'Content-Type' => 'application/vnd.elife.search+json; version=1',
+                    'Content-Type' => 'application/vnd.elife.search+json; version=2',
                 ],
                 json_encode([
                     'total' => 0,
@@ -314,6 +388,7 @@ final class SubjectControllerTest extends PageTestCase
                     'types' => [
                         'correction' => 0,
                         'editorial' => 0,
+                        'expression-concern' => 0,
                         'feature' => 0,
                         'insight' => 0,
                         'research-advance' => 0,
@@ -331,6 +406,7 @@ final class SubjectControllerTest extends PageTestCase
                         'interview' => 0,
                         'labs-post' => 0,
                         'podcast-episode' => 0,
+                        'reviewed-preprint' => 0,
                     ],
                 ])
             )

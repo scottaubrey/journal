@@ -38,15 +38,9 @@ final class AlertsController extends Controller
             ), 'Science in plain language', 2),
             ArticleSection::basic($this->render(
                 Listing::unordered([
-                    '<a href="'.$this->get('router')->generate('content-alerts-variant', ['variant' => 'early-career']).'">Sign up to our monthly early-career researchers community newsletter</a> for details on upcoming webinars, new programmes, interviews, and other efforts to support positive research culture in life sciences and biomedicine',
+                    '<a href="'.$this->get('router')->generate('content-alerts-variant', ['variant' => 'early-career']).'">Sign up to our monthly eLife community newsletter</a> for details on upcoming webinars, new programmes, interviews, and other efforts to support positive research culture in life sciences and biomedicine',
                 ], 'bullet')
             ), 'Community-building', 2),
-            ArticleSection::basic($this->render(
-                Listing::unordered([
-                    'For the latest in eLife Labs, innovation, and new tools, <a href="'.$this->get('router')->generate('content-alerts-variant', ['variant' => 'technology']).'">sign up for our technology and innovation newsletter</a>',
-                    'Subscribe to the RSS feed for <a href="'.$this->get('router')->generate('rss-labs').'">all the open source technology innovation news</a> from eLife Sciences',
-                ], 'bullet')
-            ), 'eLife&apos;s Innovation Initiative and technology news', 2),
             ArticleSection::basic($this->render(
                 Listing::unordered([
                     'Sign up to receive our <a href="'.$this->get('router')->generate('content-alerts-variant', ['variant' => 'elife-newsletter']).'">bi-monthly newsletter</a> for recent developments at eLife, new products and collaborations and changes to editorial policy.</a>',

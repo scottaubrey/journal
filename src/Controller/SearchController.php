@@ -30,40 +30,17 @@ use function GuzzleHttp\Promise\promise_for;
 
 final class SearchController extends Controller
 {
-    private static $magazineTypes = [
-        'blog-article',
-        'collection',
-        'editorial',
-        'feature',
-        'insight',
-        'interview',
-        'labs-post',
-        'podcast-episode',
-    ];
-
-    private static $researchTypes = [
-        'correction',
-        'registered-report',
-        'replication-study',
-        'research-advance',
-        'research-article',
-        'research-communication',
-        'retraction',
-        'review-article',
-        'scientific-correspondence',
-        'short-report',
-        'tools-resources',
-    ];
-
     public function queryAction(Request $request) : Response
     {
         $page = (int) $request->query->get('page', 1);
         $perPage = 10;
+        // Sanitise the 'for' query parameter.
+        $for = preg_replace(['/^\s+/', '/\s+$/', '/[\s]+/'], ['', '', ' '], $request->query->get('for'));
 
         $arguments = $this->defaultPageArguments($request);
 
         $arguments['query'] = $query = [
-            'for' => trim($request->query->get('for')),
+            'for' => $for,
             'subjects' => $request->query->get('subjects', []),
             'types' => $request->query->get('types', []),
             'sort' => $request->query->get('sort', 'relevance'),
@@ -72,14 +49,14 @@ final class SearchController extends Controller
 
         $apiTypes = [];
         if (in_array('magazine', $arguments['query']['types'])) {
-            $apiTypes = array_merge($apiTypes, self::$magazineTypes);
+            $apiTypes = array_merge($apiTypes, $this->magazineTypes());
         }
         if (in_array('research', $arguments['query']['types'])) {
-            $apiTypes = array_merge($apiTypes, self::$researchTypes);
+            $apiTypes = array_merge($apiTypes, $this->researchTypes());
         }
 
-        $search = $this->get('elife.api_sdk.search.slow')
-            ->forQuery($arguments['query']['for'])
+        $search = $this->get('elife.api_sdk.search.page')
+            ->forQuery(preg_replace('/[\-]+/', ' ', $arguments['query']['for']))
             ->forSubject(...$arguments['query']['subjects'])
             ->forType(...$apiTypes)
             ->sortBy($arguments['query']['sort']);
@@ -182,8 +159,8 @@ final class SearchController extends Controller
                 $filterGroups[] = new FilterGroup(
                     'Type',
                     [
-                        new Filter(in_array('magazine', $arguments['query']['types']), 'Magazine', $this->countForTypes(self::$magazineTypes, $allTypes), 'types[]', 'magazine'),
-                        new Filter(in_array('research', $arguments['query']['types']), 'Research', $this->countForTypes(self::$researchTypes, $allTypes), 'types[]', 'research'),
+                        new Filter(in_array('magazine', $arguments['query']['types']), 'Magazine', $this->countForTypes($this->magazineTypes(), $allTypes), 'types[]', 'magazine'),
+                        new Filter(in_array('research', $arguments['query']['types']), 'Research', $this->countForTypes($this->researchTypes(), $allTypes), 'types[]', 'research'),
                     ]
                 );
 
@@ -215,5 +192,40 @@ final class SearchController extends Controller
         return array_sum(array_filter(iterator_to_array($allTypes), function (int $count, string $key) use ($types) {
             return in_array($key, $types);
         }, ARRAY_FILTER_USE_BOTH));
+    }
+
+    private function magazineTypes()
+    {
+        return [
+            'blog-article',
+            'collection',
+            'editorial',
+            'feature',
+            'insight',
+            'interview',
+            'labs-post',
+            'podcast-episode',
+        ];
+    }
+
+    private function researchTypes()
+    {
+        $types = [
+            'correction',
+            'expression-concern',
+            'registered-report',
+            'replication-study',
+            'research-advance',
+            'research-article',
+            'research-communication',
+            'retraction',
+            'review-article',
+            'scientific-correspondence',
+            'short-report',
+            'tools-resources',
+            'reviewed-preprint',
+        ];
+
+        return $types;
     }
 }

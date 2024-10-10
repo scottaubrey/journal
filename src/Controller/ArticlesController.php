@@ -23,6 +23,8 @@ use eLife\ApiSdk\Model\FundingAward;
 use eLife\ApiSdk\Model\HasContent;
 use eLife\ApiSdk\Model\Identifier;
 use eLife\ApiSdk\Model\Model;
+use eLife\ApiSdk\Model\PublicReview;
+use eLife\ApiSdk\Model\ReviewedPreprint;
 use eLife\ApiSdk\Model\Reviewer;
 use eLife\Journal\Exception\EarlyResponse;
 use eLife\Journal\Helper\Callback;
@@ -30,16 +32,22 @@ use eLife\Journal\Helper\DownloadLink;
 use eLife\Journal\Helper\HasPages;
 use eLife\Journal\Helper\Humanizer;
 use eLife\Patterns\ViewModel;
+use eLife\Patterns\ViewModel\Assessment;
 use eLife\Patterns\ViewModel\ArticleSection;
+use eLife\Patterns\ViewModel\ContentAside;
 use eLife\Patterns\ViewModel\ContentHeaderNew;
 use eLife\Patterns\ViewModel\ContextualData;
 use eLife\Patterns\ViewModel\Doi;
+use eLife\Patterns\ViewModel\JumpMenu;
 use eLife\Patterns\ViewModel\InfoBar;
 use eLife\Patterns\ViewModel\Link;
 use eLife\Patterns\ViewModel\Listing;
 use eLife\Patterns\ViewModel\Paragraph;
+use eLife\Patterns\ViewModel\ProcessBlock;
 use eLife\Patterns\ViewModel\ReadMoreItem;
 use eLife\Patterns\ViewModel\SpeechBubble;
+use eLife\Patterns\ViewModel\TabbedNavigation;
+use eLife\Patterns\ViewModel\Term;
 use eLife\Patterns\ViewModel\ViewSelector;
 use GuzzleHttp\Promise\PromiseInterface;
 use Symfony\Component\HttpFoundation\RedirectResponse;
@@ -66,7 +74,7 @@ final class ArticlesController extends Controller
         /** @var Sequence $recommendations */
         $recommendations = new PromiseSequence($arguments['item']
             ->then(function (ArticleVersion $item) {
-                if (in_array($item->getType(), ['correction', 'retraction'])) {
+                if (in_array($item->getType(), ['correction', 'expression-concern', 'retraction'])) {
                     return new EmptySequence();
                 }
 
@@ -77,8 +85,8 @@ final class ArticlesController extends Controller
 
         $arguments['furtherReading'] = $recommendations
             ->filter(function (Model $model) use ($arguments) {
-                // Remove corrections and retractions for this article.
-                if ($model instanceof ArticleVersion && in_array($model->getType(), ['correction', 'retraction'])) {
+                // Remove corrections, expressions of concern and retractions for this article.
+                if ($model instanceof ArticleVersion && in_array($model->getType(), ['correction', 'expression-concern', 'retraction'])) {
                     foreach ($arguments['relatedArticles'] as $relatedArticle) {
                         if ($relatedArticle->getId() === $model->getId()) {
                             return false;
@@ -115,7 +123,7 @@ final class ArticlesController extends Controller
 
         $arguments['paginator'] = all(['paginator' => $arguments['paginator'], 'item' => $arguments['item']])
             ->then(function (array $parts) {
-                if (in_array($parts['item']->getType(), ['correction', 'retraction'])) {
+                if (in_array($parts['item']->getType(), ['correction', 'expression-concern', 'retraction'])) {
                     return null;
                 }
 
@@ -162,7 +170,7 @@ final class ArticlesController extends Controller
                     $related = true;
                 }
 
-                $item = $this->convertTo($relatedItem, ViewModel\Teaser::class, ['variant' => 'relatedItem', 'from' => $item->getType(), 'related' => $related ?? false]);
+                $item = $this->convertTo($relatedItem, ViewModel\Teaser::class, ['variant' => 'relatedItem', 'from' => $item->getType(), 'related' => $related ?? false, 'updatedText' => false]);
 
                 if ($listing) {
                     return ViewModel\ListingTeasers::withSeeMore([$item], new ViewModel\SeeMoreLink(new Link('Further reading', '#listing')));
@@ -178,16 +186,9 @@ final class ArticlesController extends Controller
 
         $figures = $this->findFigures($arguments['item'])->then(Callback::method('notEmpty'));
 
-        $arguments['hasFigures'] = all(['item' => $arguments['item'], 'hasFigures' => $figures])
-            ->then(function (array $parts) {
-                $item = $parts['item'];
-                $hasFigures = $parts['hasFigures'];
+        $arguments['hasFigures'] = $this->checkHasFigures($arguments['item'], $figures);
 
-                return
-                    $item->getAdditionalFiles()->notEmpty()
-                    ||
-                    $hasFigures;
-            });
+        $arguments['hasPeerReview'] = $this->hasPeerReview($arguments['item'], $arguments['isMagazine'], $arguments['history']);
 
         $dataAvailability = (new PromiseSequence($arguments['item']
             ->then(Callback::method('getDataAvailability'))))
@@ -263,6 +264,8 @@ final class ArticlesController extends Controller
                 return $context;
             });
 
+        $arguments = $this->contentAsideArguments($arguments);
+
         $arguments['body'] = all(['item' => $arguments['item'], 'isMagazine' => $arguments['isMagazine'], 'history' => $arguments['history'], 'citations' => $arguments['citations'], 'downloads' => $arguments['downloads'], 'pageViews' => $arguments['pageViews'], 'data' => $arguments['hasData'], 'context' => $context])
             ->then(function (array $parts) {
                 /** @var ArticleVersion $item */
@@ -306,6 +309,40 @@ final class ArticlesController extends Controller
                     $first = false;
                 }
 
+                if ($item instanceof ArticleVoR && $item->getElifeAssessment()) {
+                    $first = true;
+                    $summary = 'During the peer-review process the editor and reviewers write an eLife Assessment that summarises the significance of the findings reported in the article (on a scale ranging from landmark to useful) and the strength of the evidence (on a scale ranging from exceptional to inadequate). <a href="https://elifesciences.org/about/elife-assessments">Learn more about eLife Assessments</a>';
+                    $significanceTerms = [['term' => 'Landmark'], ['term' => 'Fundamental'], ['term' => 'Important'], ['term' => 'Valuable'], ['term' => 'Useful']];
+                    $strengthTerms = [['term' => 'Exceptional'], ['term' => 'Compelling'], ['term' => 'Convincing'], ['term' => 'Solid'], ['term' => 'Incomplete'], ['term' => 'Inadequate']];
+                    $content = $item->getElifeAssessment()->getContent();
+                    $resultSignificance = $this->highlightAndFormatTerms($content, $significanceTerms);
+                    $resultStrength = $this->highlightAndFormatTerms($content, $strengthTerms);
+                    $significanceAriaLable = 'eLife assessments use a common vocabulary to describe significance. The term chosen for this paper is:';
+                    $strengthAriaLable = 'eLife assessments use a common vocabulary to describe strength of evidence. The term or terms chosen for this paper is:';
+                    $significance = !empty($resultSignificance['formattedDescription']) ? new Term('Significance of the findings:', implode("\n", $resultSignificance['formattedDescription']), $resultSignificance['highlightedTerm'], $significanceAriaLable) : null;
+                    $strength = !empty($resultStrength['formattedDescription']) ? new Term('Strength of evidence:', implode("\n", $resultStrength['formattedDescription']), $resultStrength['highlightedTerm'], $strengthAriaLable) : null;
+
+                    $parts[] = ArticleSection::collapsible(
+                        'elife-assessment',
+                        $item->getElifeAssessmentTitle(),
+                        2,
+                        $this->render(...$this->convertContent($item->getElifeAssessment(), 2, $context)),
+                        null,
+                        ArticleSection::STYLE_HIGHLIGHTED,
+                        false,
+                        $first,
+                        $item->getElifeAssessment()->getDoi() ? new Doi($item->getElifeAssessment()->getDoi()) : null,
+                        null,
+                        new Assessment(
+                            $significance,
+                            $strength,
+                            $summary
+                        )
+                    );
+
+                    $first = false;
+                }
+
                 if ($item instanceof ArticleVoR && $item->getEditorEvaluation()) {
                     // Editor's evaluation should feel connected to abstract and not be collapsible
                     $first = true;
@@ -319,7 +356,7 @@ final class ArticlesController extends Controller
                         $relatedLinks[] = new Link('Reviews on Sciety', $item->getEditorEvaluationScietyUri());
                     }
 
-                    $relatedLinks[] = new Link('eLife\'s review process', $this->get('router')->generate('about-peer-review'));
+                    $relatedLinks[] = new Link('eLife\'s review process', $this->get('router')->generate('about-pubpub', ['type'=> 'peer-review']));
 
                     $parts[] = ArticleSection::collapsible(
                         $item->getEditorEvaluation()->getId() ?? 'editor-evaluation',
@@ -411,7 +448,7 @@ final class ArticlesController extends Controller
                     );
                 }
 
-                if ($item instanceof ArticleVoR && $item->getDecisionLetter()) {
+                if ($item->getType() === 'feature' && $item->getDecisionLetter()) {
                     $parts[] = ArticleSection::collapsible(
                         $item->getDecisionLetter()->getId() ?? 'decision-letter',
                         'Decision letter',
@@ -421,12 +458,14 @@ final class ArticlesController extends Controller
                         null,
                         null,
                         true,
-                        false,
+                        $first,
                         $item->getDecisionLetter()->getDoi() ? new Doi($item->getDecisionLetter()->getDoi()) : null
                     );
+
+                    $first = false;
                 }
 
-                if ($item instanceof ArticleVoR && $item->getAuthorResponse()) {
+                if ($item->getType() === 'feature' && $item->getAuthorResponse()) {
                     $parts[] = ArticleSection::collapsible(
                         $item->getAuthorResponse()->getId() ?? 'author-response',
                         'Author response',
@@ -435,7 +474,7 @@ final class ArticlesController extends Controller
                         null,
                         null,
                         true,
-                        false,
+                        $first,
                         $item->getAuthorResponse()->getDoi() ? new Doi($item->getAuthorResponse()->getDoi()) : null
                     );
                 }
@@ -454,19 +493,28 @@ final class ArticlesController extends Controller
                     $funding = $item->getFunding()->getAwards()
                         ->map(function (FundingAward $award) {
                             $title = $award->getSource()->getPlace()->toString();
+                            $headerLink = null;
 
-                            if ($award->getAwardId()) {
+                            if ($award->getAwardDoi()) {
+                                $headerLinkDoi = "https://doi.org/{$award->getAwardDoi()}";
+                                $headerLink = new ViewModel\Link(
+                                    $headerLinkDoi,
+                                    $headerLinkDoi
+                                );
+                            } else if ($award->getAwardId()) {
                                 $title .= ' ('.$award->getAwardId().')';
                             }
 
+                            $recipients = $award->getRecipients()->notEmpty() ? $award->getRecipients()
+                                ->map(Callback::method('toString'))
+                                ->toArray() : ['No recipients declared.'];
+
                             $body = Listing::unordered(
-                                $award->getRecipients()
-                                    ->map(Callback::method('toString'))
-                                    ->toArray(),
+                                $recipients,
                                 'bullet'
                             );
 
-                            return ArticleSection::basic($this->render($body), $title, 4);
+                            return ArticleSection::basic($this->render($body), $title, 4, null, null, null, null, false, $headerLink);
                         })->toArray();
 
                     $funding[] = new Paragraph($item->getFunding()->getStatement());
@@ -482,15 +530,7 @@ final class ArticlesController extends Controller
                     );
                 }
 
-                if ($item->getEthics()->notEmpty()) {
-                    $infoSections[] = ArticleSection::basic(
-                        $this->render(...$item->getEthics()->map($this->willConvertTo(null, ['level' => 3]))),
-                        'Ethics',
-                        3
-                    );
-                }
-
-                if ($item->getReviewers()->notEmpty()) {
+                if (!$item->getReviewers()->isEmpty() && !$this->hasPeerReview($item, $isMagazine, $history)->wait()) {
                     $roles = $item->getReviewers()
                         ->reduce(function (array $roles, Reviewer $reviewer) {
                             $entry = $reviewer->getPreferredName();
@@ -522,7 +562,7 @@ final class ArticlesController extends Controller
                     });
 
                     foreach ($roles as $role => $reviewers) {
-                        if (count($reviewers) > 1) {
+                        if (count($reviewers) > 2) {
                             $role = "${role}s";
                         }
 
@@ -534,65 +574,36 @@ final class ArticlesController extends Controller
                     }
                 }
 
-                $received = $history->getReceived();
-                $accepted = $history->getAccepted();
-                $publicationHistory = [];
-
-                /** @var ArticlePreprint[] $preprints */
-                $preprints = $history->getVersions()
-                    ->filter(Callback::isInstanceOf(ArticlePreprint::class))
-                    ->toArray();
-
-                if ($preprints) {
-                    foreach ($preprints as $preprint) {
-                        // Attempt to output $received if date is before the preprint date.
-                        if ($received && 1 === $preprint->getPublishedDate()->diff(new DateTime($received->toString()))->invert) {
-                            $publicationHistory[] = 'Received: '.$received->format();
-
-                            // Set $received to null as it has now been included in the publication history.
-                            $received = null;
-                        }
-                        // Attempt to output $accepted if date is before the preprint date.
-                        if ($accepted && 1 === $preprint->getPublishedDate()->diff(new DateTime($accepted->toString()))->invert) {
-                            $publicationHistory[] = 'Accepted: '.$accepted->format();
-
-                            // Set $accepted to null as it has now been included in the publication history.
-                            $accepted = null;
-                        }
-
-                        $publicationHistory[] = sprintf('Preprint posted: <a href="%s">%s (view preprint)</a>', $preprint->getUri(), $preprint->getPublishedDate()->format('F j, Y'));
-                    }
+                if ($item->getEthics()->notEmpty()) {
+                    $infoSections[] = ArticleSection::basic(
+                        $this->render(...$item->getEthics()->map($this->willConvertTo(null, ['level' => 3]))),
+                        'Ethics',
+                        3
+                    );
                 }
 
-                // Output $received if it has not yet been output.
-                if ($received) {
-                    $publicationHistory[] = 'Received: '.$received->format();
+                if ($item instanceof ArticleVoR && (
+                        $item->isReviewedPreprint() ||
+                        in_array($item->getType(), ['feature', 'correction', 'expression-concern', 'retraction']) ||
+                        $isMagazine)
+                    ) {
+                    $publicationHistory = $this->generatePublicationHistoryForNewVor($history);
+                    $publicationHistoryTitle = ($isMagazine || 'feature' === $item->getType()) ? 'Publication history' : 'Version history';
+                    $infoSections[] = ArticleSection::basic(
+                        $this->render(
+                            Listing::ordered($publicationHistory, 'bullet')
+                        ),
+                        $publicationHistoryTitle,
+                        3
+                    );
                 }
 
-                // Output $accepted if it has not yet been output.
-                if ($accepted) {
-                    $publicationHistory[] = 'Accepted: '.$accepted->format();
+                if ($item instanceof ArticleVoR && $item->isReviewedPreprint()) {
+                    $infoSections[] = ArticleSection::basic(
+                        sprintf('<p>You can cite all versions using the DOI  <a href="https://doi.org/%s">https://doi.org/%s</a>. This DOI represents all versions, and will always resolve to the latest one.</p>', $item->getDoi(), $item->getDoi()),
+                        'Cite all versions', 3
+                    );
                 }
-
-                $publicationHistory = array_merge($publicationHistory, $history->getVersions()
-                    ->filter(Callback::isInstanceOf(ArticlePoA::class))
-                    ->map(function (ArticlePoA $itemVersion, int $number) use ($history) {
-                        return sprintf('Accepted Manuscript %s: <a href="%s">%s (version %s)</a>', 0 === $number ? 'published' : 'updated', $this->generatePath($history, $itemVersion->getVersion()), $itemVersion->getVersionDate() ? $itemVersion->getVersionDate()->format('F j, Y') : '', $itemVersion->getVersion());
-                    })->toArray());
-
-                $publicationHistory = array_merge($publicationHistory, $history->getVersions()
-                    ->filter(Callback::isInstanceOf(ArticleVoR::class))
-                    ->map(function (ArticleVoR $itemVersion, int $number) use ($history) {
-                        return sprintf('Version of Record %s: <a href="%s">%s (version %s)</a>', 0 === $number ? 'published' : 'updated', $this->generatePath($history, $itemVersion->getVersion()), $itemVersion->getVersionDate() ? $itemVersion->getVersionDate()->format('F j, Y') : '', $itemVersion->getVersion());
-                    })->toArray());
-
-                $infoSections[] = ArticleSection::basic(
-                    $this->render(
-                        Listing::ordered($publicationHistory, 'bullet')
-                    ),
-                    'Publication history',
-                    3
-                );
 
                 $copyright = '<p>'.$item->getCopyright()->getStatement().'</p>';
 
@@ -600,7 +611,7 @@ final class ArticlesController extends Controller
                     $copyright = sprintf('<p>© %s, %s</p>', 2011 + $item->getVolume(), $item->getCopyright()->getHolder()).$copyright;
                 }
 
-                $infoSections[] = ArticleSection::basic($copyright, 'Copyright', 3);
+                $infoSections[] = ArticleSection::basic($copyright, 'Copyright', 3, 'copyright');
 
                 $parts[] = ArticleSection::collapsible(
                     'info',
@@ -614,30 +625,30 @@ final class ArticlesController extends Controller
 
                 $statistics = [];
                 $statisticsExtra = [];
+                $statisticsDescription = [];
 
                 if ($pageViews) {
-                    $statistics[] = ViewModel\Statistic::fromNumber('Page views', $pageViews);
+                    $statistics[] = ViewModel\Statistic::fromNumber('views', $pageViews);
                     $statisticsExtra[] = new ViewModel\BarChart($item->getId(), 'article', 'page-views', rtrim($this->getParameter('api_url_public'), '/'), 'page-views', 'month');
                 }
 
                 if ($downloads) {
-                    $statistics[] = ViewModel\Statistic::fromNumber('Downloads', $downloads);
+                    $statistics[] = ViewModel\Statistic::fromNumber('downloads', $downloads);
                     $statisticsExtra[] = new ViewModel\BarChart($item->getId(), 'article', 'downloads', rtrim($this->getParameter('api_url_public'), '/'), 'downloads', 'month');
                 }
 
                 if ($citations) {
-                    $statistics[] = ViewModel\Statistic::fromNumber('Citations', $citations->getHighest()->getCitations());
-                    $statisticsExtra[] = new Paragraph('Article citation count generated by polling the highest count across the following sources: '.implode(', ', array_map(function (CitationsMetricSource $source) {
-                        return sprintf('<a href="%s">%s</a>', $source->getUri(), $source->getService());
-                    }, $citations->toArray())).'.');
+                    $statistics[] = ViewModel\Statistic::fromNumber('citations', $citations->getHighest()->getCitations());
                 }
 
                 if (!empty($statistics)) {
+                    $statisticsDescription[] = new Paragraph('Views, downloads and citations are aggregated across all versions of this paper published by eLife.');
+
                     $parts[] = ArticleSection::collapsible(
                         'metrics',
                         'Metrics',
                         2,
-                        $this->render(new ViewModel\StatisticCollection(...$statistics), ...$statisticsExtra),
+                        $this->render(new ViewModel\StatisticCollection(...$statistics), ...$statisticsDescription, ...$statisticsExtra),
                         null,
                         null,
                         true
@@ -649,13 +660,32 @@ final class ArticlesController extends Controller
 
         $arguments['viewSelector'] = $this->createViewSelector($arguments['item'], $arguments['isMagazine'], $arguments['hasFigures'], false, $arguments['history'], $arguments['body'], $arguments['eraArticle']);
 
-        $arguments['body'] = all(['item' => $arguments['item'], 'body' => $arguments['body'], 'downloadLinks' => $arguments['downloadLinks']])
+        $arguments['tabbedNavigation'] = $this->createTabbedNavigation($arguments['item'], $arguments['isMagazine'], $arguments['hasFigures'], 'fullText', $arguments['history'], $arguments['body'], $arguments['eraArticle'], $arguments['hasPeerReview']);
+
+        $arguments['jumpMenu'] = $this->createJumpMenu($arguments['item'], $arguments['isMagazine'], $arguments['hasFigures'], false, $arguments['history'], $arguments['body'], $arguments['eraArticle']);
+
+        $arguments['body'] = all(['item' => $arguments['item'], 'body' => $arguments['body'], 'downloadLinks' => $arguments['downloadLinks'], 'isMagazine' => $arguments['isMagazine']])
             ->then(function (array $parts) {
                 $item = $parts['item'];
                 $body = $parts['body'];
                 $downloadLinks = $parts['downloadLinks'];
+                $isMagazine = $parts['isMagazine'];
 
                 $body[] = ArticleSection::basic($this->render($downloadLinks), 'Download links', 2);
+
+
+                if (!$isMagazine && 'feature' !== $item->getType()) {
+                    $share[] = new Doi($item->getDoi());
+                    $share[] = new ViewModel\SocialMediaSharersNew(
+                        strip_tags($item->getFullTitle()),
+                        "https://doi.org/{$item->getDoi()}",
+                        true,
+                        true
+                    );
+                    $body[] =  ArticleSection::basic($this->render(...$share), 'Share this article', 3,
+                        'share', null, null, null, false, null, null, 'article-section__sharers');
+                }
+
 
                 $body[] = $this->convertTo($item, ViewModel\ArticleMeta::class);
 
@@ -752,6 +782,8 @@ final class ArticlesController extends Controller
                 return new ViewModel\AdditionalAssets(null, $files->toArray());
             }));
 
+        $arguments['hasPeerReview'] = $this->hasPeerReview($arguments['item'], $arguments['isMagazine'], $arguments['history']);
+
         $arguments['body'] = all([
             'isMagazine' => $arguments['isMagazine'],
             'figures' => $figures,
@@ -794,7 +826,11 @@ final class ArticlesController extends Controller
             })
             ->then(Callback::mustNotBeEmpty(new NotFoundHttpException('Article version does not contain any figures or data')));
 
-        $arguments['viewSelector'] = $this->createViewSelector($arguments['item'], $arguments['isMagazine'], promise_for(true), true, $arguments['history'], $arguments['body'], $arguments['eraArticle']);
+        $arguments['tabbedNavigation'] = $this->createTabbedNavigation($arguments['item'], $arguments['isMagazine'], promise_for(true), 'figures', $arguments['history'], $arguments['body'], $arguments['eraArticle'], $arguments['hasPeerReview']);
+
+        $arguments['jumpMenu'] = $this->createJumpMenu($arguments['item'], $arguments['isMagazine'], promise_for(true), true, $arguments['history'], $arguments['body'], $arguments['eraArticle']);
+
+        $arguments = $this->contentAsideArguments($arguments);
 
         $arguments['body'] = all(['body' => $arguments['body'], 'downloadLinks' => $arguments['downloadLinks']])
             ->then(function (array $parts) {
@@ -807,6 +843,280 @@ final class ArticlesController extends Controller
             });
 
         return new Response($this->get('templating')->render('::article-figures.html.twig', $arguments));
+    }
+
+    public function peerReviewsAction(Request $request, string $id, int $version = null) : Response
+    {
+        $arguments = $this->articlePageArguments($request, $id, $version);
+
+        $arguments['title'] = $arguments['title']
+            ->then(function (string $title) {
+                return 'Peer review in '.$title;
+            });
+
+        $arguments['contextualData'] = all(['item' => $arguments['item'], 'metrics' => $arguments['contextualDataMetrics']])
+            ->then(function (array $parts) {
+                /** @var ArticleVersion $item */
+                $item = $parts['item'];
+                /** @var array $metrics */
+                $metrics = $parts['metrics'];
+
+                if (!$item->getCiteAs()) {
+                    if (empty($metrics)) {
+                        return null;
+                    }
+
+                    return ContextualData::withMetrics($metrics);
+                }
+
+                return ContextualData::withCitation($item->getCiteAs(), new Doi($item->getDoi()), $metrics);
+            });
+
+        $figures = $this->findFigures($arguments['item'])->then(Callback::method('notEmpty'));
+
+        $bioprotocols = $this->get('elife.api_sdk.bioprotocols')
+            ->list(Identifier::article($id))
+            ->otherwise($this->mightNotExist())
+            ->otherwise($this->softFailure('Failed to load bioprotocols', []));
+
+        $context = all(['item' => $arguments['item'], 'history' => $arguments['history'], 'hasFigures' => $figures, 'bioprotocols' => $bioprotocols])
+            ->then(function (array $parts) {
+                $context = [];
+                if ($parts['hasFigures']) {
+                    $context['figuresUri'] = $this->generatePath($parts['history'], $parts['item']->getVersion(), 'figures');
+                }
+
+                $context['bioprotocols'] = $parts['bioprotocols'];
+
+                return $context;
+            });
+
+        $arguments['hasFigures'] = $this->checkHasFigures($arguments['item'], $figures);
+
+        $arguments['body'] = all(['item' => $arguments['item'], 'isMagazine' => $arguments['isMagazine'], 'context' => $context, 'history' => $arguments['history']])
+            ->then(function (array $parts) {
+                /** @var ArticleVersion $item */
+                $item = $parts['item'];
+                /** @var bool $isMagazine */
+                $isMagazine = $parts['isMagazine'];
+                /** @var array $context */
+                $context = $parts['context'];
+                /** @var ArticleHistory $history */
+                $history = $parts['history'];
+                /** @var array $parts */
+                $parts = [];
+                /** @var array $relatedLinks */
+                $relatedLinks = [];
+
+                if ($item instanceof ArticleVoR && $item->isReviewedPreprint()) {
+                    $peerReviewText = new Paragraph('<strong>Version of Record: </strong>This is the final version of the article.');
+                    $peerReview[] = ArticleSection::basic(
+                        $this->render(
+                            new ProcessBlock(
+                                $this->render($peerReviewText),
+                                'vor',
+                                new Link(
+                                    'Read more about eLife\'s peer review process.',
+                                    $this->get('router')->generate('peer-review-process')
+                                )
+                            )
+                        )
+                    );
+                } else if ($item instanceof ArticleVoR && !$item->isReviewedPreprint()) {
+                    $peerReview[] = new Paragraph('This article was accepted for publication as part of eLife\'s original publishing model.');
+                } else if ($item instanceof ArticlePoA) {
+                    $peerReview[] = new Paragraph('This article was accepted for publication via eLife\'s original publishing model. eLife publishes the authors\' accepted manuscript as a PDF only version before the full Version of Record is ready for publication. Peer reviews are published along with the Version of Record.');
+                }
+
+                if ($item instanceof ArticleVoR && !$item->isReviewedPreprint() || $item instanceof ArticlePoA) {
+                    $publicationHistory = $this->generatePublicationHistoryForOldVorAndPoa($history);
+                    $publicationHistoryTitle = 'History';
+
+                    $peerReview[] = ArticleSection::basic(
+                        $this->render(
+                            Listing::ordered($publicationHistory, 'line')
+                        ),
+                        $publicationHistoryTitle,
+                        3
+                    );
+
+                    $preprints = $history->getVersions()
+                        ->filter(Callback::isInstanceOf(ArticlePreprint::class))
+                        ->toArray();
+
+                    if (isset($preprints[0])) {
+                        $uri = $preprints[0]->getUri();
+                        $relatedLinks[] = new Link('Go to the preprint', $uri);
+                    }
+                }
+
+                $parts[] = ArticleSection::collapsible(
+                    'peer-review-process',
+                    'Peer review process',
+                    2,
+                    $this->render(...$peerReview),
+                    $relatedLinks ? $relatedLinks : null,
+                    ArticleSection::STYLE_PEER_REVIEW,
+                    true,
+                    true,
+                    null,
+                    $relatedLinks ? ArticleSection::RELATED_LINKS_SEPARATOR_CIRCLE : null
+                );
+
+                if ($item instanceof ArticleVoR && $item->isReviewedPreprint()) {
+                    $roles = $item->getReviewers()
+                        ->reduce(function (array $roles, Reviewer $reviewer) {
+                            $entry = $reviewer->getPreferredName();
+
+                            $roles[$reviewer->getRole()][] = $entry;
+
+                            foreach ($reviewer->getAffiliations() as $affiliation) {
+                                $roles[$reviewer->getRole()][] = $affiliation->toString();
+                            }
+
+                            return $roles;
+                        }, []);
+
+                    uksort($roles, function (string $a, string $b) : int {
+                        if (false !== stripos($a, 'Senior')) {
+                            return -1;
+                        }
+                        if (false !== stripos($b, 'Senior')) {
+                            return 1;
+                        }
+                        if (false !== stripos($a, 'Editor')) {
+                            return -1;
+                        }
+                        if (false !== stripos($b, 'Editor')) {
+                            return 1;
+                        }
+
+                        return 0;
+                    });
+
+                    foreach ($roles as $role => $reviewers) {
+                        if (count($reviewers) > 2) {
+                            $role = "${role}s";
+                        }
+
+                        $infoSections[] = ArticleSection::basic(
+                            $this->render(Listing::ordered($reviewers)),
+                            $role, null, null, null, null, 'editor', false, null, null, null, true
+                        );
+                    }
+
+                    $parts[] = ArticleSection::collapsible(
+                        'editors',
+                        'Editors',
+                        2,
+                        $this->render(...$infoSections),
+                        null,
+                        null,
+                        true
+                    );
+                }
+
+
+                if ($item instanceof ArticleVoR && !$item->isReviewedPreprint() && $item->getDecisionLetter()) {
+                    $parts[] = ArticleSection::collapsible(
+                        $item->getDecisionLetter()->getId() ?? 'decision-letter',
+                        'Decision letter',
+                        2,
+                        $this->render($this->convertTo($item, ViewModel\DecisionLetterHeader::class)).
+                        $this->render(...$this->convertContent($item->getDecisionLetter(), 2, $context)),
+                        null,
+                        null,
+                        true,
+                        false,
+                        $item->getDecisionLetter()->getDoi() ? new Doi($item->getDecisionLetter()->getDoi()) : null
+                    );
+                }
+
+                if ($item instanceof ArticleVoR && $item->getPublicReviews()->notEmpty()) {
+                    $publicReviews = $item->getPublicReviews()->map(function (PublicReview $publicReview, $index) use ($context) {
+                        $publicReviewSection = ArticleSection::collapsible(
+                            $publicReview->getId(),
+                            $publicReview->getTitle(),
+                            2,
+                            $this->render(...$this->convertContent($publicReview, 3, $context)),
+                            null,
+                            null,
+                            false,
+                            false,
+                            $publicReview->getDoi() ? new Doi($publicReview->getDoi()) : null
+                        );
+
+                        return $publicReviewSection;
+                    })->toArray();
+
+                    $parts = array_merge($parts, $publicReviews);
+
+                    if ($item->getRecommendationsForAuthors()) {
+                        $parts[] = ArticleSection::collapsible(
+                            $item->getRecommendationsForAuthors()->getId(),
+                            $item->getRecommendationsForAuthorsTitle(),
+                            2,
+                            $this->render(...$this->convertContent($item->getRecommendationsForAuthors(), 3, $context)),
+                            null,
+                            null,
+                            false,
+                            false,
+                            $item->getRecommendationsForAuthors()->getDoi() ? new Doi($item->getRecommendationsForAuthors()->getDoi()) : null
+                        );
+                    }
+                }
+
+                if ($item instanceof ArticleVoR && $item->getAuthorResponse()) {
+                    $parts[] = ArticleSection::collapsible(
+                        $item->getAuthorResponse()->getId() ?? 'author-response',
+                        'Author response',
+                        2,
+                        $this->render(...$this->convertContent($item->getAuthorResponse(), 2, $context)),
+                        null,
+                        null,
+                        true,
+                        false,
+                        $item->getAuthorResponse()->getDoi() ? new Doi($item->getAuthorResponse()->getDoi()) : null
+                    );
+                }
+
+                return $parts;
+            })
+            ->then(Callback::mustNotBeEmpty(new NotFoundHttpException('Article version does not contain any figures or data')));
+
+        $arguments['tabbedNavigation'] = $this->createTabbedNavigation($arguments['item'], $arguments['isMagazine'], $arguments['hasFigures'], 'peerReviews', $arguments['history'], $arguments['body'], $arguments['eraArticle'], promise_for(true));
+
+        $arguments['jumpMenu'] = $this->createJumpMenu($arguments['item'], $arguments['isMagazine'], promise_for(true), true, $arguments['history'], $arguments['body'], $arguments['eraArticle']);
+
+        $arguments = $this->contentAsideArguments($arguments);
+
+        $arguments['body'] = all(['item' => $arguments['item'], 'body' => $arguments['body'], 'downloadLinks' => $arguments['downloadLinks'], 'isMagazine' => $arguments['isMagazine']])
+            ->then(function (array $parts) {
+                $item = $parts['item'];
+                $body = $parts['body'];
+                $downloadLinks = $parts['downloadLinks'];
+                $isMagazine = $parts['isMagazine'];
+
+                $body[] = ArticleSection::basic($this->render($downloadLinks), 'Download links', 2);
+
+
+                if (!$isMagazine && 'feature' !== $item->getType()) {
+                    $share[] = new Doi($item->getDoi());
+                    $share[] = new ViewModel\SocialMediaSharersNew(
+                        strip_tags($item->getFullTitle()),
+                        "https://doi.org/{$item->getDoi()}",
+                        true,
+                        true
+                    );
+
+                    $body[] =  ArticleSection::basic($this->render(...$share), 'Share this article', 3,
+                        'share', null, null, null, false, null, null, 'article-section__sharers');
+                }
+
+                return $body;
+            });
+
+        return new Response($this->get('templating')->render('::article-peer-reviews.html.twig', $arguments));
     }
 
     public function bibTexAction(Request $request, string $id) : Response
@@ -962,7 +1272,7 @@ final class ArticlesController extends Controller
                 ];
             });
 
-        $arguments['infoBars'] = all(['item' => $arguments['item'], 'history' => $arguments['history'], 'relatedArticles' => $arguments['relatedArticles'], 'eraArticle' => $arguments['eraArticle']])
+        $arguments['infoBars'] = all(['item' => $arguments['item'], 'history' => $arguments['history'], 'relatedArticles' => $arguments['relatedArticles'], 'eraArticle' => $arguments['eraArticle'], 'isMagazine' => $arguments['isMagazine']])
             ->then(function (array $parts) {
                 /** @var ArticleVersion $item */
                 $item = $parts['item'];
@@ -972,6 +1282,8 @@ final class ArticlesController extends Controller
                 $relatedArticles = $parts['relatedArticles'];
                 /** @var array $eraArticle */
                 $eraArticle = $parts['eraArticle'];
+                /** @var bool $isMagazine */
+                $isMagazine = $parts['isMagazine'];
 
                 $infoBars = [];
 
@@ -991,9 +1303,12 @@ final class ArticlesController extends Controller
                 }
 
                 if (count($relatedArticles) > 0) {
-                    switch ($type = $item->getType()) {
+                    switch ($item->getType()) {
                         case 'correction':
                             $infoBars[] = new InfoBar('This is a correction notice. Read the <a href="'.$this->get('router')->generate('article', [$relatedArticles[0]]).'">corrected article</a>.', InfoBar::TYPE_CORRECTION);
+                            break;
+                        case 'expression-concern':
+                            $infoBars[] = new InfoBar('This is an expression of concern. Read the <a href="'.$this->get('router')->generate('article', [$relatedArticles[0]]).'">related article</a>.', InfoBar::TYPE_ATTENTION);
                             break;
                         case 'retraction':
                             $infoBars[] = new InfoBar('This is a retraction notice. Read the <a href="'.$this->get('router')->generate('article', [$relatedArticles[0]]).'">retracted article</a>.', InfoBar::TYPE_ATTENTION);
@@ -1001,9 +1316,16 @@ final class ArticlesController extends Controller
                     }
 
                     foreach ($relatedArticles as $relatedArticle) {
+                        if (!($relatedArticle instanceof ArticleVersion)) {
+                            continue;
+                        }
+
                         switch ($relatedArticle->getType()) {
                             case 'correction':
                                 $infoBars[] = new InfoBar('This article has been corrected. Read the <a href="'.$this->get('router')->generate('article', [$relatedArticle]).'">correction notice</a>.', InfoBar::TYPE_CORRECTION);
+                                break;
+                            case 'expression-concern':
+                                $infoBars[] = new InfoBar('Concern(s) have been raised about this article. Read the <a href="'.$this->get('router')->generate('article', [$relatedArticle]).'">expression of concern</a>.', InfoBar::TYPE_ATTENTION);
                                 break;
                             case 'retraction':
                                 $infoBars[] = new InfoBar('This article has been retracted. Read the <a href="'.$this->get('router')->generate('article', [$relatedArticle]).'">retraction notice</a>.', InfoBar::TYPE_ATTENTION);
@@ -1039,7 +1361,12 @@ final class ArticlesController extends Controller
             ->otherwise($this->mightNotExist())
             ->otherwise($this->softFailure('Failed to load page views count'));
 
-        $arguments['contextualDataMetrics'] = all(['item' => $arguments['item'], 'history' => $arguments['history'], 'citations' => $arguments['citations'], 'pageViews' => $arguments['pageViews']])
+        $arguments['downloads'] = $this->get('elife.api_sdk.metrics')
+            ->totalDownloads(Identifier::article($id))
+            ->otherwise($this->mightNotExist())
+            ->otherwise($this->softFailure('Failed to load downloads count'));
+
+        $arguments['contextualDataMetrics'] = all(['item' => $arguments['item'], 'history' => $arguments['history'], 'citations' => $arguments['citations'], 'pageViews' => $arguments['pageViews'], 'downloads'=> $arguments['downloads']])
             ->then(function (array $parts) {
                 /** @var ArticleVersion $item */
                 $item = $parts['item'];
@@ -1049,6 +1376,8 @@ final class ArticlesController extends Controller
                 $citations = $parts['citations'];
                 /** @var int|null $pageViews */
                 $pageViews = $parts['pageViews'];
+                /** @var int|null $downloads */
+                $downloads = $parts['downloads'];
 
                 $metricLink = function (int $count, string $suffix) use ($history, $item) {
                     // @todo - improve pattern-library or patterns-php so class doesn't need to be set here.
@@ -1059,6 +1388,9 @@ final class ArticlesController extends Controller
 
             if (null !== $pageViews && $pageViews > 0) {
                 $metrics[] = $metricLink($pageViews, 'views');
+            }
+            if (null !== $downloads && $downloads > 0) {
+                $metrics[] = $metricLink($downloads, 'downloads');
             }
             if ($citations instanceof CitationsMetric && $citations->getHighest()->getCitations() > 0) {
                 $metrics[] = $metricLink($citations->getHighest()->getCitations(), 'citations');
@@ -1097,18 +1429,111 @@ final class ArticlesController extends Controller
         return $arguments;
     }
 
+    private function createTabbedNavigation(PromiseInterface $item, PromiseInterface $isMagazine, PromiseInterface $hasFigures, string $pageType, PromiseInterface $history, PromiseInterface $sections, array $eraArticle, PromiseInterface $hasPeerReview) : PromiseInterface
+    {
+        return all(['item' => $item, 'isMagazine' => $isMagazine, 'hasFigures' => $hasFigures, 'history' => $history, 'sections' => $sections, 'hasPeerReview' => $hasPeerReview])
+            ->then(function (array $sections) use ($pageType, $eraArticle) {
+
+                $history = $sections['history'];
+                $item = $sections['item'];
+                $hasFigures = $sections['hasFigures'];
+                $hasPeerReview = $sections['hasPeerReview'];
+                $links = [];
+
+                if ($sections['isMagazine'] || 'feature' === $item->getType()) {
+                    return false;
+                }
+                $links[] = ViewModel\TabbedNavigationLink::fromLink(
+                                    new Link('Full text', $this->generatePath($history, $item->getVersion(), null, 'content')),
+                                    $pageType === 'fullText' ? " tabbed-navigation__tab-label--active" : null
+                                );
+
+                if ($hasFigures) {
+                    $links[] = ViewModel\TabbedNavigationLink::fromLink(
+                                    new Link('Figures<span class="tabbed-navigation__tab-label--long"> and data</span>', $this->generatePath($history, $item->getVersion(), 'figures', 'content')),
+                                    $pageType === 'figures' ? " tabbed-navigation__tab-label--active" : null
+                                );
+                }
+
+                $articleVersions = $history->getVersions()
+                    ->filter(Callback::isInstanceOf(ArticleVersion::class))
+                    ->toArray();
+
+                $latestVersion = $articleVersions[count($articleVersions) - 1]->getVersion();
+                if (isset($eraArticle['display']) && $item->getVersion() === $latestVersion) {
+                    $links[] = ViewModel\TabbedNavigationLink::fromLink(new Link(
+                        'Executable code',
+                        $this->get('router')->generate('article-era', ['id' => $item->getId()])
+                    ));
+                }
+
+                if ($hasPeerReview) {
+                    $links[] = ViewModel\TabbedNavigationLink::fromLink(
+                                        new Link('Peer review', $this->generatePath($history, $item->getVersion(), 'peer-reviews', 'content')),
+                                        $pageType === 'peerReviews' ? " tabbed-navigation__tab-label--active" : null
+                                );
+                }
+
+                if ($item instanceof ArticleVoR) {
+                    $sideBySideUrl = rtrim($this->getParameter('side_by_side_view_url'), '/').'/'.$item->getId();
+                    $links[] = ViewModel\TabbedNavigationLink::fromLink(
+                        new Link('Side by side', $sideBySideUrl), null, true
+                    );
+                }
+
+                return new TabbedNavigation($links);
+            });
+    }
+
+    private function createJumpMenu(PromiseInterface $item, PromiseInterface $isMagazine, PromiseInterface $hasFigures, bool $isFiguresPage, PromiseInterface $history, PromiseInterface $sections, array $eraArticle) : PromiseInterface
+    {
+        return all(['item' => $item, 'isMagazine' => $isMagazine, 'hasFigures' => $hasFigures, 'history' => $history, 'sections' => $sections])
+            ->then(function (array $sections) use ($isFiguresPage, $eraArticle) {
+
+                $hasFigures = $sections['hasFigures'];
+                $item = $sections['item'];
+
+                if ($sections['isMagazine']  || 'feature' === $item->getType()) {
+                    return false;
+                }
+
+                $sections = $sections['sections'];
+                $sections = array_filter($sections, Callback::isInstanceOf(ArticleSection::class));
+
+                if (count($sections) < 1) {
+                    if (!$hasFigures) {
+                        return null;
+                    }
+
+                    $sections = [];
+                }
+
+                return new JumpMenu(
+                    array_map(function (ViewModel $viewModel, $i) {
+                        if ($viewModel instanceof ArticleSection) {
+                            return new Link($viewModel['title'], '#'.$viewModel['id']);
+                        }
+
+                        return null;
+                    }, $sections, array_keys($sections))
+                );
+            });
+    }
+
     private function createViewSelector(PromiseInterface $item, PromiseInterface $isMagazine, PromiseInterface $hasFigures, bool $isFiguresPage, PromiseInterface $history, PromiseInterface $sections, array $eraArticle) : PromiseInterface
     {
         return all(['item' => $item, 'isMagazine' => $isMagazine, 'hasFigures' => $hasFigures, 'history' => $history, 'sections' => $sections])
             ->then(function (array $sections) use ($isFiguresPage, $eraArticle) {
-                if ($sections['isMagazine']) {
-                    return null;
-                }
 
                 $item = $sections['item'];
                 $hasFigures = $sections['hasFigures'];
                 $history = $sections['history'];
                 $sections = $sections['sections'];
+
+                // show view selector only on  Feature Articles
+                if ('feature' !== $item->getType()) {
+                    return null;
+                }
 
                 $sections = array_filter($sections, Callback::isInstanceOf(ArticleSection::class));
 
@@ -1135,7 +1560,7 @@ final class ArticlesController extends Controller
                 }
 
                 return new ViewSelector(
-                    $this->generatePath($history, $item->getVersion(), null, 'content'),
+                    new Link('Article', $this->generatePath($history, $item->getVersion(), null, 'content')),
                     array_values(array_filter(array_map(function (ViewModel $viewModel) {
                         if ($viewModel instanceof ArticleSection) {
                             return new Link($viewModel['title'], '#'.$viewModel['id']);
@@ -1143,14 +1568,162 @@ final class ArticlesController extends Controller
 
                         return null;
                     }, $sections))),
-                    $hasFigures ? $this->generatePath($history, $item->getVersion(), 'figures', 'content') : null,
+                    $hasFigures ? new Link('Figures and data', $this->generatePath($history, $item->getVersion(), 'figures', 'content')) : null,
                     $isFiguresPage,
+                    false,
                     $item instanceof ArticleVoR
                         ? rtrim($this->getParameter('side_by_side_view_url'), '/').'/'.$item->getId()
                         : null,
                     $otherLinks
                 );
             });
+    }
+
+
+    private function contentAsideArguments(array $arguments) : array
+    {
+        $arguments['contentAside'] = all([
+            'item' => $arguments['item'],
+            'isMagazine' => $arguments['isMagazine'],
+            'metrics' => $arguments['contextualDataMetrics'],
+            'history' => $arguments['history'],
+            'relatedItem' => $arguments['relatedItem'] ?? promise_for(null),
+        ])
+            ->then(function (array $parts) {
+                /** @var ArticleVersion $item */
+                $item = $parts['item'];
+
+                if ($parts['isMagazine'] || 'feature' === $item->getType()) {
+                    return false;
+                }
+
+                /** @var ArticleHistory $history */
+                $history = $parts['history'];
+
+                $publicationHistory = [];
+
+                $articleVersions = $history->getVersions()
+                    ->filter(Callback::isInstanceOf(ArticleVersion::class))
+                    ->sort(function (ArticleVersion $a, ArticleVersion $b) {
+                        return $a->getVersion() <=> $b->getVersion();
+                    });
+
+                $prepareDefinition = function (int $index, string $term, string $descriptor, string $color = null, bool $isActive = false) {
+                    return [
+                        // index added to allow us to sort.
+                        'index' => $index,
+                        'term' => $term,
+                        'descriptors' => [
+                            $descriptor,
+                        ],
+                        'color' => $color,
+                        'isActive' => $isActive
+                    ];
+                };
+
+                $prepareDefinitionArticleVersion = function (ArticleVersion $articleVersion, bool $first) use ($prepareDefinition, $history, $item) {
+                    $isLastVor = $articleVersion->getVersion() === $item->getVersion() && $articleVersion instanceof ArticleVoR && $articleVersion->isReviewedPreprint();
+                    $versionLabel = $articleVersion instanceof ArticleVoR ? 'Version of Record' : 'Accepted Manuscript';
+                    return $prepareDefinition(
+                        $articleVersion->getVersionDate() ? $articleVersion->getVersionDate()->getTimeStamp() : 0,
+                        sprintf(
+                            '%s',
+                                $articleVersion->getVersion() === $item->getVersion() ?
+                                    $versionLabel
+                                    : sprintf('<a href="%s">%s</a>', $this->generatePath($history, $articleVersion->getVersion()), $versionLabel)
+                        ),
+                        sprintf(
+                            '%s %s',
+                            $articleVersion->getVersionDate() ?
+                                sprintf(
+                                    '<time datetime="%s">%s</time>',
+                                    $articleVersion->getVersionDate()->format('Y-m-d'),
+                                    $articleVersion->getVersionDate()->format('F j, Y')
+                                ) : '',
+                            $isLastVor ?
+                                sprintf(
+                                    '<a href="%s">Read the peer reviews</a>',
+                                    $this->generatePath($history, $item->getVersion(), 'peer-reviews', 'content')
+                                ) : ''
+                            ),
+                        $isLastVor ? 'vor': '',
+                        $articleVersion->getVersion() === $item->getVersion()
+                    );
+                };
+
+                $publicationHistory = array_merge($publicationHistory, $articleVersions
+                    ->filter(Callback::isInstanceOf(ArticleVoR::class))
+                    ->map(function(ArticleVoR $itemVersion, int $number) use ($prepareDefinitionArticleVersion) {
+                        return $prepareDefinitionArticleVersion($itemVersion, 0 === $number);
+                    })->reverse()->toArray());
+
+                $publicationHistory = array_merge($publicationHistory, $articleVersions
+                    ->filter(Callback::isInstanceOf(ArticlePoA::class))
+                    ->map(function(ArticlePoA $itemVersion, int $number) use ($prepareDefinitionArticleVersion) {
+                        return $prepareDefinitionArticleVersion($itemVersion, 0 === $number);
+                    })->reverse()->toArray());
+                $publicationHistory = array_merge($publicationHistory, $history->getVersions()
+                    ->filter(Callback::isInstanceOf(ArticlePreprint::class))
+                    ->filter(function($preprint) {
+                        return strpos($preprint->getDescription(), 'reviewed preprint') !== false;
+                    })
+                    ->map(function(ArticlePreprint $preprint) use ($prepareDefinition) {
+                        return $prepareDefinition(
+                            $preprint->getPublishedDate()->getTimeStamp(),
+                            sprintf(
+                                '<a href="%s">Reviewed preprint</a>',
+                                $preprint->getUri()
+                            ),
+                            sprintf(
+                                '<time datetime="%s">%s</time>',
+                                $preprint->getPublishedDate()->format('Y-m-d'),
+                                $preprint->getPublishedDate()->format('F j, Y')
+                            )
+                        );
+                    })->reverse()->toArray());
+
+                // Sort by index value.
+                usort($publicationHistory, function($first, $second) {
+                    return $first['index'] < $second['index'];
+                });
+
+                $timeline = [];
+
+                if (!in_array($item->getType(), ['correction', 'expression-concern', 'retraction'])) {
+                    $rpCount = $history->getVersions()
+                        ->filter(Callback::isInstanceOf(ArticlePreprint::class))
+                        ->filter(function (ArticlePreprint $preprint) {
+                            return strpos($preprint->getDescription(), 'reviewed preprint') !== false;
+                        })
+                        ->count();
+
+                    // If reviewed preprint count is greater than 1 we want to alter the $item['term'].
+                    $rpCount = $rpCount > 1 ? $rpCount : 0;
+
+                    $timeline = array_map(function ($item) use (&$rpCount) {
+                        // Remove index from item.
+                        unset($item['index']);
+
+                        if (strpos($item['term'], 'Reviewed preprint') !== false && $rpCount > 0) {
+                            $version = sprintf('<span class="version">v%d</span>', $rpCount);
+                            $item['descriptors'][0] = $version . ' ' . $item['descriptors'][0];
+                            $rpCount--;
+                        }
+
+                        return $item;
+                    }, $publicationHistory);
+                }
+
+                return $this->convertTo($parts['item'],
+                    ContentAside::class, [
+                        'metrics' => $parts['metrics'],
+                        'timeline' => $timeline,
+                        'relatedItem' => $parts['relatedItem']
+                    ]
+                );
+            });
+
+        return $arguments;
     }
 
     private function findFigures(PromiseInterface $item) : PromiseSequence
@@ -1203,5 +1776,261 @@ final class ArticlesController extends Controller
         }
 
         return $this->get('router')->generate("article-version{$subRoute}", [$currentVersion, 'version' => $forVersion, '_fragment' => $fragment]);
+    }
+
+    private function checkHasFigures($item, $figures) {
+        return all(['item' => $item, 'hasFigures' => $figures])
+            ->then(function (array $parts) {
+                $item = $parts['item'];
+                $hasFigures = $parts['hasFigures'];
+
+                return $item->getAdditionalFiles()->notEmpty() || $hasFigures;
+            });
+    }
+
+    private function hasPeerReview($item, $isMagazine, $history) {
+        return all(['item' => $item, 'isMagazine' => $isMagazine, 'history' => $history])
+            ->then(function (array $parts) {
+                $item = $parts['item'];
+                $isMagazine = $parts['isMagazine'];
+                $history = $parts['history'];
+                $combinedHistory = $history->getVersions()
+                    ->filter(function ($version) {
+                        return $version instanceof ArticleVoR || $version instanceof ArticlePoA;
+                    })
+                    ->toArray();
+
+                return ($item instanceof ArticleVoR &&
+                        ($item->getPublicReviews()->notEmpty() ||
+                        $item->getDecisionLetter() ||
+                        $item->getAuthorResponse() ||
+                        (!$item->isReviewedPreprint() &&
+                            !$isMagazine &&
+                            !in_array($item->getType(), ['feature', 'correction', 'expression-concern', 'retraction']) &&
+                            $combinedHistory
+                        )) ||
+                        ($item instanceof ArticlePoA && $combinedHistory));
+            });
+    }
+
+    private function generatePublicationHistoryForOldVorAndPoa($history) {
+        $received = $history->getReceived();
+        $accepted = $history->getAccepted();
+        $sentForReview = $history->getSentForReview();
+
+        $publicationHistory = [];
+
+        /** @var ArticlePreprint[] $preprints */
+        $preprints = $history->getVersions()
+            ->filter(Callback::isInstanceOf(ArticlePreprint::class))
+            ->toArray();
+
+        if ($preprints) {
+            foreach ($preprints as $preprint) {
+                // Attempt to output $received if date is before the preprint date.
+                if ($received && 1 === $preprint->getPublishedDate()->diff(new DateTime($received->toString()))->invert) {
+                    $publicationHistory[] = sprintf('<strong>Received</strong> <time datetime="%s">%s</time>', $received->format('Y-m-d'), $received->format());
+
+                    // Set $received to null as it has now been included in the publication history.
+                    $received = null;
+                }
+                // Attempt to output $accepted if date is before the preprint date.
+                if ($accepted && 1 === $preprint->getPublishedDate()->diff(new DateTime($accepted->toString()))->invert) {
+                    $publicationHistory[] = sprintf('<strong>Accepted</strong> <time datetime="%s">%s</time>', $accepted->format('Y-m-d'), $accepted->format());
+
+                    // Set $accepted to null as it has now been included in the publication history.
+                    $accepted = null;
+                }
+
+                // Attempt to output $sentForReview if date is before the preprint date.
+                if ($sentForReview && 1 === $preprint->getPublishedDate()->diff(new DateTime($sentForReview->toString()))->invert) {
+                    $publicationHistory[] = sprintf('<strong>Sent for peer review</strong> <time datetime="%s">%s</time>', $sentForReview->format('Y-m-d'), $sentForReview->format());
+
+                    // Set $sentForReview to null as it has now been included in the publication history.
+                    $sentForReview = null;
+                }
+
+                $publicationHistory[] = sprintf(
+                    '<strong>Preprint posted</strong> <time datetime="%s">%s</time>',
+                    $preprint->getPublishedDate()->format('Y-m-d'),
+                    $preprint->getPublishedDate()->format('F j, Y')
+                );
+            }
+        }
+        // Output $received if it has not yet been output.
+        if ($received) {
+            $publicationHistory[] = sprintf('<strong>Received</strong> <time datetime="%s">%s</time>', $received->format('Y-m-d'), $received->format());
+        }
+
+        // Output $accepted if it has not yet been output.
+        if ($accepted) {
+            $publicationHistory[] = sprintf('<strong>Accepted</strong> <time datetime="%s">%s</time>', $accepted->format('Y-m-d'), $accepted->format());
+        }
+
+        // Output $sentForReview if it has not yet been output.
+        if ($sentForReview) {
+            $publicationHistory[] = sprintf('<strong>Sent for peer review</strong> <time datetime="%s">%s</time>', $sentForReview->format('Y-m-d'), $sentForReview->format());
+        }
+
+        $publicationHistory = array_merge($publicationHistory, $history->getVersions()
+            ->filter(Callback::isInstanceOf(ArticlePoA::class))
+            ->map(function (ArticlePoA $itemVersion, int $number) use ($preprints, $history) {
+                return sprintf('<strong>Accepted Manuscript %s</strong> <time datetime="%s">%s</time>', 0 === $number ? 'published' : 'updated', $itemVersion->getVersionDate() ? $itemVersion->getVersionDate()->format('Y-m-d') : '', $itemVersion->getVersionDate() ? $itemVersion->getVersionDate()->format('F j, Y') : '');
+            })->toArray());
+
+        $publicationHistory = array_merge($publicationHistory, $history->getVersions()
+            ->filter(Callback::isInstanceOf(ArticleVoR::class))
+            ->map(function (ArticleVoR $itemVersion, int $number) use ($preprints, $history) {
+                return sprintf('<strong>Version of Record %s</strong> <time datetime="%s">%s</time>', 0 === $number ? 'published' : 'updated', $itemVersion->getVersionDate() ? $itemVersion->getVersionDate()->format('Y-m-d') : '', $itemVersion->getVersionDate() ? $itemVersion->getVersionDate()->format('F j, Y') : '');
+            })->toArray());
+
+        return array_reverse($publicationHistory);
+    }
+
+    private function generatePublicationHistoryForNewVor($history) {
+        $received = $history->getReceived();
+        $accepted = $history->getAccepted();
+        $sentForReview = $history->getSentForReview();
+
+        $publicationHistory = [];
+
+        /** @var ArticlePreprint[] $preprints */
+        $preprints = $history->getVersions()
+            ->filter(Callback::isInstanceOf(ArticlePreprint::class))
+            ->toArray();
+
+        if ($preprints) {
+            $rpCount = $history->getVersions()
+                ->filter(Callback::isInstanceOf(ArticlePreprint::class))
+                ->filter(function (ArticlePreprint $preprint) {
+                    return strpos($preprint->getDescription(), 'reviewed preprint') !== false;
+                })
+                ->count();
+
+            $counter = 0;
+
+            foreach ($preprints as $preprint) {
+                // Attempt to output $received if date is before the preprint date.
+                if ($received && 1 === $preprint->getPublishedDate()->diff(new DateTime($received->toString()))->invert) {
+                    $publicationHistory[] = sprintf('Received: <time datetime="%s">%s</time>', $received->format('Y-m-d'), $received->format());
+
+                    // Set $received to null as it has now been included in the publication history.
+                    $received = null;
+                }
+                // Attempt to output $accepted if date is before the preprint date.
+                if ($accepted && 1 === $preprint->getPublishedDate()->diff(new DateTime($accepted->toString()))->invert) {
+                    $publicationHistory[] = sprintf('Accepted: <time datetime="%s">%s</time>', $accepted->format('Y-m-d'), $accepted->format());
+
+                    // Set $accepted to null as it has now been included in the publication history.
+                    $accepted = null;
+                }
+
+                // Attempt to output $sentForReview if date is before the preprint date.
+                if ($sentForReview && 1 === $preprint->getPublishedDate()->diff(new DateTime($sentForReview->toString()))->invert) {
+                    $publicationHistory[] = sprintf('Sent for peer review: <time datetime="%s">%s</time>', $sentForReview->format('Y-m-d'), $sentForReview->format());
+
+                    // Set $sentForReview to null as it has now been included in the publication history.
+                    $sentForReview = null;
+                }
+
+                if (strpos($preprint->getDescription(), 'reviewed preprint') !== false && $counter > 0 && $counter <= $rpCount) {
+                    $publicationHistory[] = sprintf(
+                        '<a href="%s">Reviewed Preprint version %s</a>: <time datetime="%s">%s</time>',
+                        $preprint->getUri(),
+                        $counter,
+                        $preprint->getPublishedDate()->format('Y-m-d'),
+                        $preprint->getPublishedDate()->format('F j, Y')
+                    );
+                } else {
+                    $publicationHistory[] = sprintf(
+                        '<a href="%s">Preprint posted</a>: <time datetime="%s">%s</time>',
+                        $preprint->getUri(),
+                        $preprint->getPublishedDate()->format('Y-m-d'),
+                        $preprint->getPublishedDate()->format('F j, Y')
+                    );
+                }
+
+                $counter++;
+            }
+        }
+
+        // Output $received if it has not yet been output.
+        if ($received) {
+            $publicationHistory[] = sprintf('Received: <time datetime="%s">%s</time>', $received->format('Y-m-d'), $received->format());
+        }
+
+        // Output $accepted if it has not yet been output.
+        if ($accepted) {
+            $publicationHistory[] = sprintf('Accepted: <time datetime="%s">%s</time>', $accepted->format('Y-m-d'), $accepted->format());
+        }
+
+        // Output $sentForReview if it has not yet been output.
+        if ($sentForReview) {
+            $publicationHistory[] = sprintf('Sent for peer review: <time datetime="%s">%s</time>', $sentForReview->format('Y-m-d'), $sentForReview->format());
+        }
+
+        $publicationHistory = array_merge($publicationHistory, $history->getVersions()
+            ->filter(Callback::isInstanceOf(ArticlePoA::class))
+            ->map(function (ArticlePoA $itemVersion, int $number) use ($preprints, $history) {
+                return sprintf('<a href="%s">Accepted Manuscript %s</a>: <time datetime="%s">%s</time>', $this->generatePath($history, $itemVersion->getVersion()), 0 === $number ? 'published' : 'updated', $itemVersion->getVersionDate() ? $itemVersion->getVersionDate()->format('Y-m-d') : '', $itemVersion->getVersionDate() ? $itemVersion->getVersionDate()->format('F j, Y') : '');
+            })->toArray());
+
+        $publicationHistory = array_merge($publicationHistory, $history->getVersions()
+            ->filter(Callback::isInstanceOf(ArticleVoR::class))
+            ->map(function (ArticleVoR $itemVersion, int $number) use ($preprints, $history) {
+                return sprintf('<a href="%s">Version of Record %s</a>: <time datetime="%s">%s</time>', $this->generatePath($history, $itemVersion->getVersion()), 0 === $number ? 'published' : 'updated', $itemVersion->getVersionDate() ? $itemVersion->getVersionDate()->format('Y-m-d') : '', $itemVersion->getVersionDate() ? $itemVersion->getVersionDate()->format('F j, Y') : '');
+            })->toArray());
+
+        return $publicationHistory;
+    }
+
+    private function highlightAndFormatTerms($content, array $terms): array {
+        $formattedDescription = [];
+        $highlightedWords = [];
+
+        foreach ($content as $contentItem) {
+            if (method_exists($contentItem, 'getText')) {
+                $text = $contentItem->getText();
+
+                preg_match_all('/<b>(.*?)<\/b>/', $text, $matches);
+
+                if (!empty($matches[1])) {
+                    $highlightedWords = array_merge($highlightedWords, $matches[1]);
+                }
+            }
+        }
+
+        $highlightedTerm = array_map(function ($term) use ($highlightedWords, &$formattedDescription) {
+            $termDescriptions = [
+                'landmark' => 'Findings with profound implications that are expected to have widespread influence',
+                'fundamental' => 'Findings that substantially advance our understanding of major research questions',
+                'important' => 'Findings that have theoretical or practical implications beyond a single subfield',
+                'valuable' => 'Findings that have theoretical or practical implications for a subfield',
+                'useful' => 'Findings that have focused importance and scope',
+                'exceptional' => 'Exemplary use of existing approaches that establish new standards for a field',
+                'compelling' => 'Evidence that features methods, data and analyses more rigorous than the current state-of-the-art',
+                'convincing' => 'Appropriate and validated methodology in line with current state-of-the-art',
+                'solid' => 'Methods, data and analyses broadly support the claims with only minor weaknesses',
+                'incomplete' => 'Main claims are only partially supported',
+                'inadequate' => 'Methods, data and analyses do not support the primary claims',
+            ];
+
+            $termWord = strtolower($term['term']);
+
+            if (in_array($termWord, $highlightedWords)) {
+                $term['isHighlighted'] = true;
+
+                if (isset($termDescriptions[$termWord])) {
+                    $formattedDescription[$termWord] = sprintf("<p><b>%s</b>: %s</p>", ucfirst($termWord), $termDescriptions[$termWord]);
+                }
+            }
+
+            return $term;
+        }, $terms);
+
+        return [
+            'highlightedTerm' => $highlightedTerm,
+            'formattedDescription' => $formattedDescription
+        ];
     }
 }

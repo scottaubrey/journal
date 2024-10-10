@@ -4,9 +4,9 @@ namespace eLife\Journal\ViewModel\Converter;
 
 use eLife\ApiSdk\Model\Event;
 use eLife\Journal\Helper\LicenceUri;
+use eLife\Journal\Helper\ModelName;
 use eLife\Patterns\ViewModel;
 use Symfony\Component\Routing\Generator\UrlGeneratorInterface;
-use function strip_tags;
 
 final class EventContentHeaderConverter implements ViewModelConverter
 {
@@ -22,27 +22,29 @@ final class EventContentHeaderConverter implements ViewModelConverter
      */
     public function convert($object, string $viewModel = null, array $context = []) : ViewModel
     {
-        return new ViewModel\ContentHeader(
+        $meta = ViewModel\MetaNew::withDate(ViewModel\Date::simple($object->getStarts()));
+
+        return new ViewModel\ContentHeaderNew(
             $object->getTitle(),
-            null,
-            $object->getImpactStatement(),
-            true,
+            false, true, null, $object->getImpactStatement(), true,
+            new ViewModel\Breadcrumb([
+                new ViewModel\Link(
+                    ModelName::singular('event'),
+                    $this->urlGenerator->generate('events')
+                ),
+            ]),
             [],
+            null, null, null, null, null,
+            !empty($context['metrics']) ? ViewModel\ContextualData::withMetrics($context['metrics']) : null,
             null,
+            $meta,
             null,
-            null,
-            new ViewModel\SocialMediaSharers(
-                strip_tags($object->getTitle()),
-                $this->urlGenerator->generate('event', [$object], UrlGeneratorInterface::ABSOLUTE_URL)
-            ),
-            null,
-            ViewModel\Meta::withLink(new ViewModel\Link('Event', $this->urlGenerator->generate('events')), ViewModel\Date::simple($object->getStarts())),
             LicenceUri::default()
         );
     }
 
     public function supports($object, string $viewModel = null, array $context = []) : bool
     {
-        return $object instanceof Event && ViewModel\ContentHeader::class === $viewModel;
+        return $object instanceof Event && ViewModel\ContentHeaderNew::class === $viewModel;
     }
 }

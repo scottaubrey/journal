@@ -21,39 +21,17 @@ home:
 
 about:
     path: /about
-    defaults:
-         _controller: AppBundle:About:about
 
-about-aims-scope:
-    path: /about/aims-scope
-    defaults:
-         _controller: AppBundle:About:aimsScope
-
-about-research-culture:
-    path: /about/research-culture
-    defaults:
-         _controller: AppBundle:About:researchCulture
-
-about-technology:
-    path: /about/technology
-    defaults:
-         _controller: AppBundle:About:technology
-
-about-peer-review:
-    path: /about/peer-review
-    defaults:
-         _controller: AppBundle:About:peerReview
+about-pubpub:
+    path: /about/{type}
+    requirements:
+      type: '(aims-scope|research-culture|technology|peer-review|publishing-with-elife)'
 
 about-people:
     path: /about/people/{type}
     defaults:
          _controller: AppBundle:About:people
          type: ''
-
-about-publishing-with-elife:
-    path: /about/publishing-with-elife
-    defaults:
-         _controller: AppBundle:About:publishingWithElife
 
 alerts:
     path: /alerts
@@ -141,7 +119,7 @@ article-type:
     defaults:
          _controller: AppBundle:ArticleTypes:list
     requirements:
-        type: '(correction|editorial|feature|insight|research-advance|research-article|research-communication|retraction|registered-report|replication-study|review-article|scientific-correspondence|short-report|tools-resources)'
+        type: '(correction|editorial|expression-concern|feature|insight|research-advance|research-article|research-communication|retraction|registered-report|replication-study|review-article|scientific-correspondence|short-report|tools-resources)'
 
 article-version-xml:
     path: /articles/{id}v{version}.xml
@@ -180,6 +158,21 @@ article-figures:
     requirements:
         id: '[a-z0-9-]+'
 
+article-version-peer-reviews:
+    path: /articles/{id}v{version}/peer-reviews
+    defaults:
+         _controller: AppBundle:Articles:peerReviews
+    requirements:
+        id: '[a-z0-9-]+'
+        version: '[1-9][0-9]*'
+
+article-peer-reviews:
+    path: /articles/{id}/peer-reviews
+    defaults:
+         _controller: AppBundle:Articles:peerReviews
+    requirements:
+        id: '[a-z0-9-]+'
+
 collection:
     path: /collections/{id}/{slug}
     defaults:
@@ -213,7 +206,7 @@ content-alerts-variant:
     defaults:
          _controller: AppBundle:ContentAlerts:subscribe
     requirements:
-        variant: '(early\-career|technology|elife\-newsletter)'
+        variant: '(early\-career|elife\-newsletter)'
 
 content-alerts-link-expired:
     path: /content-alerts/expired
@@ -240,7 +233,7 @@ content-alerts-unsubscribe-variant:
          _controller: AppBundle:ContentAlerts:unsubscribe
     requirements:
         id: '[a-z0-9]+'
-        variant: '(early\-career|technology|elife\-newsletter)'
+        variant: '(early\-career|elife\-newsletter)'
 
 content-alerts-optout:
     path: /content-alerts/optout/{id}
@@ -390,6 +383,11 @@ media-policy:
     defaults:
          _controller: AppBundle:MediaPolicy:mediaPolicy
 
+peer-review-process:
+    path: /peer-review-process
+    defaults:
+        _controller: AppBundle:PeerReviewProcess:peerReviewProcess
+
 profile:
     path: /profiles/{id}
     defaults:
@@ -409,6 +407,16 @@ resources:
     path: /resources
     defaults:
          _controller: AppBundle:Resources:resources
+
+reviewed-preprint:
+    path: /reviewed-preprints/{id}
+    requirements:
+        id: '[a-z0-9-]+'
+
+reviewed-preprints:
+    path: /reviewed-preprints
+    defaults:
+         _controller: AppBundle:ReviewedPreprints:list
 
 rss-ahead:
     path: /rss/ahead.xml
@@ -451,6 +459,11 @@ submit:
     path: /submit
     defaults:
         _controller: AppBundle:Submit:redirect
+
+submit-your-research:
+    path: /submit-your-research
+    defaults:
+        _controller: AppBundle:Submit:submit
 
 terms:
     path: /terms

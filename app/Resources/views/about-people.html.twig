@@ -8,12 +8,6 @@
 
     {{ render_pattern(contentHeader) }}
 
-    <div class="wrapper">
-
-        {{ render_pattern(menuLink) }}
-
-    </div>
-
     {% include 'calls-to-action.html.twig' %}
 
     {% embed 'grid/listing-one-column.html.twig' with {fullWidth: true} %}
@@ -27,11 +21,5 @@
         {% endblock %}
 
     {% endembed %}
-
-    <div class="wrapper">
-
-        {{ render_pattern(menu) }}
-
-    </div>
 
 {% endblock %}

@@ -4,10 +4,12 @@ namespace eLife\Journal\Controller;
 
 use eLife\ApiSdk\Collection\PromiseSequence;
 use eLife\ApiSdk\Collection\Sequence;
+use eLife\ApiSdk\Model\Image;
 use eLife\ApiSdk\Model\Identifier;
 use eLife\Journal\Helper\Callback;
 use eLife\Journal\Helper\Paginator;
 use eLife\Journal\Pagerfanta\SequenceAdapter;
+use eLife\Patterns\ViewModel\CaptionedAsset;
 use eLife\Patterns\ViewModel\ContentHeader;
 use eLife\Patterns\ViewModel\ContentHeaderNew;
 use eLife\Patterns\ViewModel\GridListing;
@@ -78,7 +80,7 @@ final class DigestsController extends Controller
             ->then($this->checkSlug($request, Callback::method('getTitle')));
 
         $arguments = $this->defaultPageArguments($request, $arguments['item']);
-
+        
         $arguments['isMagazine'] = true;
 
         $arguments['title'] = $arguments['item']
@@ -89,19 +91,7 @@ final class DigestsController extends Controller
             ->otherwise($this->mightNotExist())
             ->otherwise($this->softFailure('Failed to load page views count'));
 
-        $arguments['contextualDataMetrics'] = all(['pageViews' => $arguments['pageViews']])
-            ->then(function (array $parts) {
-                /** @var int|null $pageViews */
-                $pageViews = $parts['pageViews'];
-
-                $metrics = [];
-
-                if (null !== $pageViews && $pageViews > 0) {
-                    $metrics[] = sprintf('<span class="contextual-data__counter">%s</span> %s', number_format($pageViews), 'views');
-                }
-
-                return $metrics;
-            });
+        $arguments = array_merge($arguments, $this->magazinePageArguments($arguments, 'digest'));
 
         $arguments['contentHeader'] = all(['item' => $arguments['item'], 'metrics' => $arguments['contextualDataMetrics']])
             ->then(function (array $parts) {
@@ -118,6 +108,18 @@ final class DigestsController extends Controller
                 return ListingTeasers::basic($collections->toArray());
             });
 
+        $arguments['socialImage'] = all(['blocks' => $arguments['blocks']])
+            ->then(function($parts) {
+                return $parts['blocks']->filter(Callback::isInstanceOf(CaptionedAsset::class))->offsetGet(0);
+            });
+
+        $arguments['blocks'] = all(['blocks' => $arguments['blocks']])
+            ->then(function($parts) {
+                return $parts['blocks']->filter(function($image) {
+                    return !($image instanceof CaptionedAsset);
+                });
+            });
+            
         return new Response($this->get('templating')->render('::digest.html.twig', $arguments));
     }
 }
