@@ -65,7 +65,7 @@ ENV PHP_ENTRYPOINT=web/app.php
 WORKDIR ${project_folder}
 
 USER root
-RUN pecl install redis && \
+RUN pecl install redis-5.3.7 && \
     docker-php-ext-enable redis && \
     rm -rf /tmp/pear/
 RUN mkdir -p build var && \
