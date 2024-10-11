@@ -18,6 +18,7 @@ services:
             dockerfile: Dockerfile.combined
         environment:
             - SYMFONY__API_URL=${API_URL}
+            - SYMFONY__API_URL_SEARCH_PAGE=${API_URL_SEARCH_PAGE:-${API_URL}}
             - SYMFONY__API_URL_PUBLIC=${API_URL_PUBLIC}
             - SYMFONY__API_KEY=${API_KEY}
             - XDEBUG_SESSION=1
