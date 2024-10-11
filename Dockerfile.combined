@@ -33,19 +33,23 @@ RUN composer --no-interaction install --ignore-platform-reqs --classmap-authorit
 #####
 ## Build image: Get node build chain and build assets
 ##
-FROM --platform=linux/amd64 node:${node_version} AS assets
+FROM node:${node_version} AS assets
 ARG project_folder
 WORKDIR ${project_folder}
 RUN apt-get update && apt-get install --no-install-recommends -y \
     nasm \
     libvips-dev \
-    phantomjs lsb-release \
+    lsb-release \
+    && wget http://ftp.de.debian.org/debian/pool/main/p/phantomjs/phantomjs_2.1.1+dfsg-2_$(dpkg --print-architecture).deb \
+    && apt-get install -y ./phantomjs_2.1.1+dfsg-2_$(dpkg --print-architecture).deb \
+    && rm ./phantomjs_2.1.1+dfsg-2_$(dpkg --print-architecture).deb \
     && rm -rf /var/lib/apt/lists/*
 
 COPY npm-shrinkwrap.json \
     package.json \
     ./
 ENV QT_QPA_PLATFORM=offscreen
+ENV CFLAGS="-DPNG_ARM_NEON_OPT=0"
 RUN npm install
 COPY assets/images/ assets/images/
 COPY gulpfile.js ./
