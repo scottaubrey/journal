@@ -1,6 +1,6 @@
 ARG php_version=7.1-fpm@sha256:85819ac1a66b10c4f16defd47379ed5274c8602df86398bb963c29f3c0d67880
-ARG composer_version=1.10@sha256:394790a35fabd3a36db01d6fbd82a49f04faa5646c32d204c1a4c8066f4bfdfb
-ARG node_version=16.17.0-bullseye@sha256:eceb0d8b7864f26e074fc5f6f116e556047cd15ffff69e0e2f5a47972a73fc16
+ARG composer_version=1.10@sha256:61fbfb143e0c2a2b68a8e103576b3ca7607e99ba2624d21b7643c5035f04d117
+ARG node_version=16.17.0-bullseye@sha256:2d8b5a419f1f98403a631f24cc9ac71a21c59399fb007ffab43654b250bd55aa
 ARG composer_dev_arg
 ARG project_folder=/srv/journal
 
