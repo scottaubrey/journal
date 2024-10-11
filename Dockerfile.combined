@@ -12,7 +12,7 @@ FROM pinterb/jq:0.0.16 AS jq
 #####
 ## Build image: Get PHP dependencies
 ##
-FROM composer:${composer_version} as composer
+FROM composer:${composer_version} AS composer
 ARG project_folder
 WORKDIR ${project_folder}
 RUN apk add --no-cache \
@@ -27,13 +27,13 @@ RUN composer --no-interaction install --no-dev --ignore-platform-reqs --classmap
 #####
 ## Build image: Get PHP dependencies (including dev deps)
 ##
-FROM composer as composer_dev
+FROM composer AS composer_dev
 RUN composer --no-interaction install --ignore-platform-reqs --classmap-authoritative --no-suggest --prefer-dist
 
 #####
 ## Build image: Get node build chain and build assets
 ##
-FROM --platform=linux/amd64 node:${node_version} as assets
+FROM --platform=linux/amd64 node:${node_version} AS assets
 ARG project_folder
 WORKDIR ${project_folder}
 RUN apt-get update && apt-get install --no-install-recommends -y \
@@ -58,7 +58,7 @@ RUN node_modules/.bin/gulp assets
 #####
 ## output image: App
 ##
-FROM ghcr.io/scottaubrey/elifesciences-php:${php_version} as app
+FROM ghcr.io/scottaubrey/elifesciences-php:${php_version} AS app
 ARG project_folder
 ENV project_folder=${project_folder}
 ENV PHP_ENTRYPOINT=web/app.php
@@ -88,7 +88,7 @@ USER www-data
 #####
 ## output image: debug_App (app with Xdebug enabled)
 ##
-FROM app as debug
+FROM app AS debug
 USER root
 RUN pecl install xdebug-2.9.8 # update version after upgrade to PHP >7.3
 COPY .docker/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
@@ -97,7 +97,7 @@ USER www-data
 #####
 ## output image: tests
 ##
-FROM debug as test
+FROM debug AS test
 USER root
 COPY --from=jq /usr/local/bin/jq /usr/bin/jq
 
@@ -131,7 +131,7 @@ CMD true
 ## Build image: critical-css
 ## Note: this target cannot be run without the journal app image above running too. See `docker-compose.combined.yml`
 ##
-FROM assets as critical-css
+FROM assets AS critical-css
 # From list at https://developers.google.com/web/tools/puppeteer/troubleshooting#chrome_headless_doesnt_launch
 RUN apt-get update && apt-get install --no-install-recommends -y \
     fonts-liberation \
