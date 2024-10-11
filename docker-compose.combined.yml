@@ -1,0 +1,126 @@
+version: '3'
+
+services:
+    # External dependencies
+    redis:
+        image: redis:6.2-alpine
+    api_dummy:
+        # image: elifesciences/api-dummy:${DEPENDENCIES_API_DUMMY}
+        image: ghcr.io/scottaubrey/elifesciences-api-dummy:latest
+        ports:
+            - '${JOURNAL_API_DUMMY_PORT}:8080'
+
+    # main app, served via FCGI, with xdebug
+    app:
+        build:
+            context: .
+            target: debug
+            dockerfile: Dockerfile.combined
+        environment:
+            - SYMFONY__API_URL=${API_URL}
+            - SYMFONY__API_URL_SEARCH_PAGE=${API_URL_SEARCH_PAGE:-${API_URL}}
+            - SYMFONY__API_URL_PUBLIC=${API_URL_PUBLIC}
+            - SYMFONY__API_KEY=${API_KEY}
+            - XDEBUG_SESSION=1
+        volumes:
+            - ./.docker/parameters.yml:/srv/journal/app/config/parameters.yml
+            - ./.docker/php.ini:/usr/local/etc/php/conf.d/x-dev.ini
+            - ./.docker/xdebug.ini:/usr/local/etc/php/conf.d/xdebug.ini
+            - ./:/srv/journal
+            - /srv/journal/var
+        depends_on:
+            - redis
+            - api_dummy
+
+    # Nginx configured to connect to FCGI and locally served content
+    web:
+        image: nginx:1.13.12-alpine
+        ports:
+            - '${JOURNAL_PORT}:80'
+        depends_on:
+            - app
+        volumes:
+            - ./.docker/nginx-default.conf:/etc/nginx/conf.d/default.conf
+            - ./web:/srv/journal/web
+
+
+    # Local-only commands to run to use this project directort as a bind-mouted shared filesystem
+    composer:
+        profiles:
+            - dependencies
+        build:
+            context: .
+            target: composer
+            dockerfile: Dockerfile.combined
+            args:
+                composer_dev_arg: ${COMPOSER_DEV_ARG}
+        volumes:
+            # composer input files
+            - ./composer.json:/srv/journal/composer.json
+            - ./composer.lock:/srv/journal/composer.lock
+
+            # composer output directory
+            - ./vendor:/srv/journal/vendor:rw
+        command: composer install
+    assets:
+        profiles:
+            - dependencies
+        build:
+            context: .
+            target: assets
+            dockerfile: Dockerfile.combined
+        volumes:
+            # Asset build chain input files
+            - ./npm-shrinkwrap.json:/srv/journal/npm-shrinkwrap.json
+            - ./package.json:/srv/journal/package.json
+            - ./assets/images:/srv/journal/assets/images
+            - ./gulpfile.js:/srv/journal/gulpfile.js
+            - ./vendor:/app/vendor
+
+            # Asset build chain output files
+            - ./node_modules:/srv/journal/node_modules:rw
+            - ./assets:/srv/journal/assets:rw
+            - ./build:/srv/journal/build:rw
+            - ./web:/srv/journal/web:rw
+        command: bash -c 'npm install && node_modules/.bin/gulp assets'
+    critical-css:
+        profiles:
+            - dependencies
+        build:
+            context: .
+            target: critical-css
+            dockerfile: Dockerfile.combined
+        environment:
+            - CRITICAL_CSS_BASE_URL=http://web:8080
+        volumes:
+            # critical-css output files
+            - ./build:/srv/journal/build:rw
+        command: node_modules/.bin/gulp critical-css:generate && ./check_critical_css.sh
+
+    # service definitions needed for testing
+    selenium:
+        profiles:
+            - tests
+        image: selenium/standalone-chrome${SELENIUM_IMAGE_SUFFIX}:2.53.1
+        ports:
+            - "4444:4444" # http://localhost:4444/wd/hub/static/resource/hub.html
+            - "5900:5900" # VNC connection for debug images
+        volumes:
+            - /dev/shm:/dev/shm
+
+    tests:
+        profiles:
+            - tests
+        build:
+            context: .
+            target: test
+            dockerfile: Dockerfile.combined
+        environment:
+            - SYMFONY__API_URL=${API_URL}
+            - SYMFONY__API_URL_PUBLIC=${API_URL_PUBLIC}
+            - SYMFONY__API_KEY=${API_KEY}
+            - XDEBUG_SESSION=1
+            - APP_ENV=ci
+        volumes:
+            # critical-css output files
+            - ./build:/srv/journal/build:rw
